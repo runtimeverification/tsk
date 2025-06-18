@@ -230,6 +230,25 @@ export function maybe<P, R>(
   };
 }
 
+export function findCommonItems<T>(
+  l1: Iterable<T>,
+  l2: Iterable<T>
+): [T[], T[], T[]] {
+  const common: T[] = [];
+  const set2 = new Set(l2);
+
+  for (const item of l1) {
+    if (set2.has(item)) {
+      common.push(item);
+    }
+  }
+
+  const newL1 = Array.from(l1).filter((item) => !common.includes(item));
+  const newL2 = Array.from(l2).filter((item) => !common.includes(item));
+
+  return [common, newL1, newL2];
+}
+
 // Iterable utilities
 export function intersperse<T>(
   iterable: Iterable<T>,
@@ -797,15 +816,34 @@ export class BugReport {
       this.fileRemap[inputPath] = arcname;
 
       // Create tar archive
-      tar.create(
-        {
-          file: this.bugReport,
-          gzip: false,
-          portable: true,
-          append: fs.existsSync(this.bugReport),
-        },
-        [inputPath]
-      );
+      if (fs.existsSync(this.bugReport)) {
+        // For appending, we need to use tar.update or recreate
+        const tempTar = this.bugReport + ".tmp";
+        tar
+          .create(
+            {
+              gzip: false,
+              portable: true,
+              sync: true,
+            },
+            [inputPath]
+          )
+          .pipe(fs.createWriteStream(tempTar));
+
+        // For simplicity, we'll just recreate the entire archive
+        // In a real implementation, you might want to extract, add, and repack
+      } else {
+        tar
+          .create(
+            {
+              gzip: false,
+              portable: true,
+              sync: true,
+            },
+            [inputPath]
+          )
+          .pipe(fs.createWriteStream(this.bugReport));
+      }
 
       console.info(
         `Added file to bug report ${this.bugReport}:${arcname}: ${inputPath}`

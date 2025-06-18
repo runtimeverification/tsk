@@ -6,4 +6,4 @@ Please install [bun](https://bun.sh/).
 
 ```bash
 $ bun install
-``
+```

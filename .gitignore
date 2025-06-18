@@ -1,0 +1,16 @@
+node_modules
+.direnv
+yarn-error.log
+out
+koka/.koka
+
+*.o
+*.out
+*.ll
+test
+
+*.pdf
+.lsp
+.clj*
+
+pyk

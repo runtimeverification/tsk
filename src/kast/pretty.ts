@@ -12,7 +12,7 @@ import {
   KVariable,
 } from "./inner";
 import type { KAst } from "./kast";
-import { sortAcCollections } from "./manip";
+import { sortAcCollections, undoAliases } from "./manip";
 import {
   KBubble,
   KClaim,

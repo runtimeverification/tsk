@@ -1,5 +1,5 @@
 import { deQuoteString } from "../dequote.ts";
-import { Token, TokenType, outerLexer } from "./outer_lexer";
+import { Loc, Token, TokenType, outerLexer } from "./outer_lexer";
 import {
   Alias,
   Assoc,
@@ -34,7 +34,7 @@ import {
   type SyntaxSentence,
 } from "./outer_syntax";
 
-const EOF_TOKEN = new Token("", TokenType.EOF, { line: 1, col: 0 });
+const EOF_TOKEN = new Token("", TokenType.EOF, new Loc(1, 0));
 
 const STRING_SENTENCE: Record<
   number,
@@ -71,6 +71,19 @@ const SIMPLE_BUBBLE_TOKENS = new Set([
 ]);
 const SORT_DECL_TOKENS = new Set([TokenType.LBRACE, TokenType.ID_UPPER]);
 const USER_LIST_IDS = new Set(["List", "NeList"]);
+
+function toAssoc(token: string): Assoc {
+  switch (token) {
+    case Assoc.LEFT:
+      return Assoc.LEFT;
+    case Assoc.RIGHT:
+      return Assoc.RIGHT;
+    case Assoc.NON_ASSOC:
+      return Assoc.NON_ASSOC;
+    default:
+      throw new Error(`Unknown assoc type: ${token}`);
+  }
+}
 
 export class OuterParser {
   private lexer: Iterator<Token>;
@@ -230,6 +243,7 @@ export class OuterParser {
         this.consume();
         const blocks: PriorityBlock[] = [];
         blocks.push(this.priorityBlock());
+        // @ts-ignore
         while (this.la.type === TokenType.GT) {
           this.consume();
           blocks.push(this.priorityBlock());
@@ -246,10 +260,12 @@ export class OuterParser {
       const groups: string[][] = [];
       let group: string[] = [];
       group.push(this.match(TokenType.KLABEL));
+      // @ts-ignore
       while (this.la.type === TokenType.KLABEL) {
         group.push(this.consume());
       }
       groups.push(group);
+      // @ts-ignore
       while (this.la.type === TokenType.GT) {
         this.consume();
         group = [];
@@ -263,7 +279,7 @@ export class OuterParser {
     }
 
     if (ASSOC_TOKENS.has(this.la.type)) {
-      const assoc = new Assoc(this.consume());
+      const assoc = toAssoc(this.consume());
       const klabels: string[] = [];
       klabels.push(this.match(TokenType.KLABEL));
       while (this.la.type === TokenType.KLABEL) {
@@ -288,6 +304,7 @@ export class OuterParser {
     if (this.la.type === TokenType.LBRACE) {
       this.consume();
       params.push(this.match(TokenType.ID_UPPER));
+      // @ts-ignore
       while (this.la.type === TokenType.COMMA) {
         this.consume();
         params.push(this.match(TokenType.ID_UPPER));
@@ -301,6 +318,7 @@ export class OuterParser {
     if (this.la.type === TokenType.LBRACE) {
       this.consume();
       args.push(this.match(TokenType.ID_UPPER));
+      // @ts-ignore
       while (this.la.type === TokenType.COMMA) {
         this.consume();
         args.push(this.match(TokenType.ID_UPPER));
@@ -317,12 +335,13 @@ export class OuterParser {
     const args: (number | string)[] = [];
     if (this.la.type === TokenType.LBRACE) {
       this.consume();
+      // @ts-ignore
       if (this.la.type === TokenType.NAT) {
         args.push(parseInt(this.consume(), 10));
       } else {
         args.push(this.match(TokenType.ID_UPPER));
       }
-
+      // @ts-ignore
       while (this.la.type === TokenType.COMMA) {
         this.consume();
         if (this.la.type === TokenType.NAT) {
@@ -341,7 +360,7 @@ export class OuterParser {
   private priorityBlock(): PriorityBlock {
     let assoc: Assoc | null = null;
     if (ASSOC_TOKENS.has(this.la.type)) {
-      assoc = new Assoc(this.consume());
+      assoc = toAssoc(this.consume());
       this.match(TokenType.COLON);
     }
 
@@ -429,6 +448,7 @@ export class OuterParser {
 
     if (this.la.type === TokenType.KW_CONTEXT) {
       this.consume();
+      // @ts-ignore
       if (this.la.type === TokenType.KW_ALIAS) {
         clsKey = this.la.type;
         this.consume();
@@ -437,7 +457,7 @@ export class OuterParser {
       this.matchAny(SIMPLE_BUBBLE_TOKENS);
     }
 
-    const cls = STRING_SENTENCE[clsKey];
+    const cls = STRING_SENTENCE[clsKey]!;
 
     let label: string;
     if (this.la.type === TokenType.LBRACK) {
@@ -467,6 +487,8 @@ export class OuterParser {
       const key = this.match(TokenType.ATTR_KEY);
 
       let value: string;
+
+      // @ts-ignore
       if (this.la.type === TokenType.LPAREN) {
         this.consume();
         switch (this.la.type) {
@@ -486,6 +508,7 @@ export class OuterParser {
 
       items.push([key, value]);
 
+      // @ts-ignore
       if (this.la.type !== TokenType.COMMA) {
         break;
       } else {

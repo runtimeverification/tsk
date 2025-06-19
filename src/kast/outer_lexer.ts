@@ -219,28 +219,19 @@ export function* outerLexer(text: Iterable<string>): Generator<Token> {
   let state = State.DEFAULT;
 
   while (true) {
-    if (SIMPLE_STATES.has(state)) {
-      const [token, newLa] = SIMPLE_STATES.get(state)!(la, it);
-      yield token;
-      const lastToken = token;
-      la = newLa;
+    let lastToken: Token;
 
-      if (lastToken.type === TokenType.EOF) {
-        return;
-      }
-      const stateKey = `${state},${lastToken.type}`;
-      state = NEXT_STATE[stateKey] ?? state;
+    if (SIMPLE_STATES.has(state)) {
+      const func = SIMPLE_STATES.get(state)!;
+      const [token, newLa] = func(la, it);
+      yield token;
+      lastToken = token;
+      la = newLa;
     } else if (BUBBLY_STATES.has(state)) {
       const [tokens, newLa] = bubbleOrContext(la, it, state === State.CONTEXT);
       yield* tokens;
-      const lastToken = tokens[tokens.length - 1];
+      lastToken = tokens[tokens.length - 1]!;
       la = newLa;
-
-      if (lastToken.type === TokenType.EOF) {
-        return;
-      }
-      const stateKey = `${state},${lastToken.type}`;
-      state = NEXT_STATE[stateKey] ?? state;
     } else if (state === State.ATTR) {
       const attrGen = attr(la, it);
       let attrResult = attrGen.next();
@@ -250,9 +241,17 @@ export function* outerLexer(text: Iterable<string>): Generator<Token> {
       }
       la = attrResult.value;
       state = State.DEFAULT;
+      continue;
     } else {
       throw new Error(`Invalid state: ${state}`);
     }
+
+    if (lastToken.type === TokenType.EOF) {
+      return;
+    }
+
+    const stateKey: string = `${state},${lastToken.type}`;
+    state = NEXT_STATE[stateKey] ?? state;
   }
 }
 
@@ -332,7 +331,7 @@ function simpleChar(
   it: Iterator<string>
 ): [string, TokenType, string] {
   const text = la;
-  const tokenType = SIMPLE_CHARS[la];
+  const tokenType = SIMPLE_CHARS[la]!;
   const result = it.next();
   const newLa = result.done ? "" : result.value;
   return [text, tokenType, newLa];
@@ -363,7 +362,7 @@ function idOrKeyword(
   }
   const text = consumed.join("");
   if (DEFAULT_KEYWORDS.has(text)) {
-    return [text, KEYWORDS[text], la];
+    return [text, KEYWORDS[text]!, la];
   }
   return [text, tokenType, la];
 }
@@ -439,7 +438,7 @@ function regexOrLowerIdOrKeyword(
   }
   const text = consumed.join("");
   if (DEFAULT_KEYWORDS.has(text)) {
-    return [text, KEYWORDS[text], la];
+    return [text, KEYWORDS[text]!, la];
   }
   return [text, TokenType.ID_LOWER, la];
 }
@@ -535,7 +534,7 @@ function syntaxKeyword(
     throw new Error(`Unexpected token: ${text}`);
   }
 
-  return [text, KEYWORDS[text], la];
+  return [text, KEYWORDS[text]!, la];
 }
 
 function upperId(
@@ -625,7 +624,7 @@ function modnameLexer(la: string, it: LocationIterator): [Token, string] {
 
   const text = consumed.join("");
   if (MODNAME_KEYWORDS.has(text)) {
-    return [new Token(text, KEYWORDS[text], loc), la];
+    return [new Token(text, KEYWORDS[text]!, loc), la];
   }
   return [new Token(text, TokenType.MODNAME, loc), la];
 }
@@ -693,7 +692,7 @@ function klabelLexer(la: string, it: LocationIterator): [Token, string] {
 
   const text = consumed.join("");
   const tokenType = KLABEL_KEYWORDS.has(text)
-    ? KEYWORDS[text]
+    ? KEYWORDS[text]!
     : TokenType.KLABEL;
   return [new Token(text, tokenType, loc), la];
 }
@@ -768,7 +767,7 @@ function rawBubble(
         if (keywords.has(currentStr)) {
           return [
             bubble.length > 0 ? bubble.join("") : null,
-            new Token(currentStr, KEYWORDS[currentStr], currentLoc),
+            new Token(currentStr, KEYWORDS[currentStr]!, currentLoc),
             la,
             bubbleLoc,
           ];
@@ -809,7 +808,7 @@ function rawBubble(
           if (keywords.has(currentStr)) {
             return [
               bubble.length > 0 ? bubble.join("") : null,
-              new Token(currentStr, KEYWORDS[currentStr], currentLoc),
+              new Token(currentStr, KEYWORDS[currentStr]!, currentLoc),
               newLa,
               bubbleLoc,
             ];
@@ -847,21 +846,31 @@ function rawBubble(
   }
 }
 
-const RULE_LABEL_PATTERN =
-  /(?s)\s*(?<lbrack>\[)\s*(?<label>[^\[\]\_\n\r\t ]+)\s*(?<rbrack>\])\s*(?<colon>:)\s*(?<rest>.*)/s;
+/*
+ * QUESTION: Yiyi: Is this translation correct?
+ * RULE_LABEL_PATTERN: Final = re.compile(
+ *   r'(?s)\s*(?P<lbrack>\[)\s*(?P<label>[^\[\]\_\n\r\t ]+)\s*(?P<rbrack>\])\s*(?P<colon>:)\s*(?P<rest>.*)'
+ * )
+ */
+const RULE_LABEL_PATTERN = /\s*(\[)\s*([^\[\]\_\n\r\t ]+)\s*(\])\s*(:)\s*(.*)/s;
 
 function stripBubbleLabel(bubble: string, loc: Loc): [Token[], string, Loc] {
   const match = bubble.match(RULE_LABEL_PATTERN);
-  if (!match || !match.groups) {
+  if (!match) {
     return [[], bubble, loc];
   }
 
-  const groups = match.groups;
-  const lbrackIndex = bubble.indexOf(groups.lbrack);
-  const labelIndex = bubble.indexOf(groups.label);
-  const rbrackIndex = bubble.indexOf(groups.rbrack);
-  const colonIndex = bubble.indexOf(groups.colon);
-  const restIndex = bubble.indexOf(groups.rest);
+  const lbrack = match[1]!;
+  const label = match[2]!;
+  const rbrack = match[3]!;
+  const colon = match[4]!;
+  const rest = match[5]!;
+
+  const lbrackIndex = bubble.indexOf(lbrack);
+  const labelIndex = bubble.indexOf(label);
+  const rbrackIndex = bubble.indexOf(rbrack);
+  const colonIndex = bubble.indexOf(colon);
+  const restIndex = bubble.indexOf(rest);
 
   const lbrackLoc = loc.add(bubble.substring(0, lbrackIndex));
   const labelLoc = lbrackLoc.add(bubble.substring(lbrackIndex, labelIndex));
@@ -871,11 +880,11 @@ function stripBubbleLabel(bubble: string, loc: Loc): [Token[], string, Loc] {
   return [
     [
       new Token("[", TokenType.LBRACK, lbrackLoc),
-      new Token(groups.label, TokenType.RULE_LABEL, labelLoc),
+      new Token(label, TokenType.RULE_LABEL, labelLoc),
       new Token("]", TokenType.RBRACK, rbrackLoc),
       new Token(":", TokenType.COLON, colonLoc),
     ],
-    groups.rest,
+    rest,
     colonLoc.add(bubble.substring(colonIndex, restIndex)),
   ];
 }

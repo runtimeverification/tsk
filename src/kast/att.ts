@@ -652,3 +652,8 @@ export function updateAtts<T extends WithKAtt>(
 ): T {
   return obj.letAtt(obj.att.update(entries)) as T;
 }
+
+// Implement a function that checks if an object implements WithKAtt
+export function isWithKAtt(obj: any): obj is WithKAtt {
+  return obj && typeof obj.letAtt === "function" && "att" in obj;
+}

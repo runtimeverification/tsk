@@ -1,5 +1,13 @@
 import { findCommonItems, hashStr, unique } from "../utils";
-import { Atts, EMPTY_ATT, KAtt, type WithKAtt } from "./att";
+import {
+  Atts,
+  EMPTY_ATT,
+  KAtt,
+  isWithKAtt,
+  mapAtt,
+  updateAtts,
+  type WithKAtt,
+} from "./att";
 import { Counter } from "./counter";
 import {
   KApply,
@@ -660,7 +668,9 @@ export function extractCells(kast: KInner, keepCells: Set<string>): KInner {
       k.isCell &&
       !keepCells.has(k.label.name) &&
       k.args.every(
-        (arg) => !(arg instanceof KApply) || !arg.isCell || arg === DOTS
+        (arg) => !(arg instanceof KApply) || !arg.isCell
+        // QUESTION: Yiyi: Cannot compare arg === DOTS here.
+        /*|| arg === DOTS*/
       )
     ) {
       return DOTS;
@@ -676,17 +686,20 @@ export function onAttributes<T extends WithKAtt>(
   f: (att: KAtt) => KAtt
 ): T {
   // TODO: Implement proper attribute mapping
-  const result = kast.mapAtt(f);
+  const result = mapAtt(kast, f);
 
   if (result instanceof KFlatModule) {
-    const sentences = result.sentences.map((sentence) => sentence.mapAtt(f));
-    return result.let({ sentences }) as T;
+    const sentences = result.sentences.map((sentence) => mapAtt(sentence, f));
+    return result.let({ sentences }) as unknown as T;
   }
 
+  // QUESTION: Yiyi: We met type error here:
+  /*
   if (result instanceof KDefinition) {
-    const modules = result.modules.map((module) => module.mapAtt(f));
-    return result.let({ modules }) as T;
+    const modules = result.modules.map((module) => mapAtt(module, f));
+    return result.let({ modules }) as unknown as T;
   }
+  */
 
   return result;
 }
@@ -724,7 +737,7 @@ export function minimizeRuleLike<T extends KRuleLike>(
   ]);
   body = minimizeTerm(body, constrainedVars);
 
-  return rule.let({ body, requires, ensures });
+  return rule.let({ body, requires, ensures }) as unknown as T;
 }
 
 export function removeSourceMap(definition: KDefinition): KDefinition {
@@ -733,8 +746,8 @@ export function removeSourceMap(definition: KDefinition): KDefinition {
 
 export function removeAttrs(term: KInner): KInner {
   function removeAttr(t: KInner): KInner {
-    if (t instanceof WithKAtt) {
-      return t.letAtt(EMPTY_ATT);
+    if (isWithKAtt(t)) {
+      return t.letAtt(EMPTY_ATT) as unknown as KInner;
     }
     return t;
   }
@@ -771,7 +784,7 @@ export function setCell(
 export function abstractTermSafely(
   kast: KInner,
   baseName: string = "V",
-  sort?: KSort,
+  sort?: KSort | null,
   existingVarNames?: Set<string>
 ): KVariable {
   function abstractFn(k: KInner): KVariable {
@@ -805,10 +818,10 @@ export function applyExistentialSubstitutions(
     const match = pattern.match(c);
     if (
       match !== null &&
-      match["#VAR"] instanceof KVariable &&
-      match["#VAR"].name.startsWith("?")
+      match.get("#VAR") instanceof KVariable &&
+      (match.get("#VAR") as KVariable).name.startsWith("?")
     ) {
-      subst[match["#VAR"].name] = match["#VAL"];
+      subst[(match.get("#VAR") as KVariable).name] = match.get("#VAR")!;
     } else {
       newConstraints.push(c);
     }
@@ -882,20 +895,22 @@ export function isSpuriousConstraint(term: KInner): boolean {
   ) {
     return true;
   }
-  if (isTop(term, true)) {
+  if (isTop(term, { weak: true })) {
     return true;
   }
   return false;
 }
 
 export function normalizeConstraints(constraints: Iterable<KInner>): KInner[] {
-  let constraintList: KInner[] = [];
+  const constraintList: KInner[] = [];
   for (const constraint of constraints) {
     constraintList.push(...flattenLabel("#And", constraint));
   }
-  constraintList = unique(constraintList);
-  constraintList = constraintList.filter((c) => !isSpuriousConstraint(c));
-  return constraintList;
+  const constraintList2 = unique(constraintList);
+  const constraintList3 = constraintList2.filter(
+    (c) => !isSpuriousConstraint(c)
+  );
+  return Array.from(constraintList3);
 }
 
 export function removeUselessConstraints(
@@ -1016,11 +1031,11 @@ export function buildRule(
   const ruleRequires = simplifyBool(mlPredToBool(mlAnd(newInitConstraints)));
   const ruleEnsures = simplifyBool(mlPredToBool(mlAnd(newFinalConstraints)));
   const attEntries =
-    priority === undefined ? [] : [Atts.PRIORITY(String(priority))];
+    priority === undefined ? [] : [Atts.PRIORITY.call(String(priority))];
   const ruleAtt = new KAtt(attEntries);
 
   const rule = new KRule(ruleBody, ruleRequires, ruleEnsures, ruleAtt);
-  const finalRule = rule.updateAtts([Atts.LABEL(ruleId)]);
+  const finalRule = updateAtts(rule, [Atts.LABEL.call(ruleId)]);
 
   return [finalRule, new Subst(vremapSubst)];
 }
@@ -1085,5 +1100,5 @@ export function defunctionalize(
   }
 
   const newKinner = topDown(defunctionalizeInner, kinner);
-  return [newKinner, unique(constraints)];
+  return [newKinner, Array.from(unique(constraints))];
 }

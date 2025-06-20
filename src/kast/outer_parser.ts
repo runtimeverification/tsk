@@ -196,10 +196,12 @@ export class OuterParser {
     const endLoc = this.la.loc.add(this.la.text);
     this.consume();
 
-    return new Module(name, sentences, imports, att, this.source, {
-      start: beginLoc,
-      end: endLoc,
-    });
+    return new Module(name, sentences, imports, att, this.source, [
+      beginLoc.line,
+      beginLoc.col,
+      endLoc.line,
+      endLoc.col,
+    ]);
   }
 
   import(): Import {

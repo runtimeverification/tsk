@@ -939,3 +939,47 @@ export const ROOT = path.dirname(path.dirname(__filename));
 export function none(_: any): void {
   // Do nothing function
 }
+
+/**
+ * Recursively convert a plain JavaScript object to a Map structure
+ * This is needed because JSON.parse() returns plain objects but KDefinition.fromDict() expects Maps
+ */
+export function objectToMap(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(objectToMap);
+  }
+
+  if (typeof obj === "object" && obj.constructor === Object) {
+    const map = new Map<string, any>();
+    for (const [key, value] of Object.entries(obj)) {
+      map.set(key, objectToMap(value));
+    }
+    return map;
+  }
+
+  return obj;
+}
+
+export function mapToObject(map: any): any {
+  // Handle non-Map/array values (primitives, dates, etc.)
+  if (!(map instanceof Map) && !Array.isArray(map)) {
+    return map;
+  }
+
+  // Convert arrays recursively
+  if (Array.isArray(map)) {
+    return map.map(mapToObject);
+  }
+
+  // Convert Map entries to an object
+  const obj = {};
+  for (const [key, value] of map.entries()) {
+    // @ts-ignore
+    obj[key] = mapToObject(value); // Recurse for nested Maps/arrays
+  }
+  return obj;
+}

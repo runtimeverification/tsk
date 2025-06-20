@@ -1,8 +1,4 @@
-export interface Location {
-  start: { line: number; col: number };
-  end: { line: number; col: number };
-}
-
+export type Location = [number, number, number, number];
 export abstract class AST {
   constructor(
     public source?: string | null,

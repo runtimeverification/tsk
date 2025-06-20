@@ -7,3 +7,9 @@ Please install [bun](https://bun.sh/).
 ```bash
 $ bun install
 ```
+
+## Run tests
+
+```bash
+$ bun test
+```

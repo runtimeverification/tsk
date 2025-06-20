@@ -507,14 +507,27 @@ export class KSequence extends KInner {
         return KInner.combineMatches(matches);
       }
 
-      // Handle variable matching at end
+      // Handle variable matching at end - only if the last element is a variable
+      // and it's different from previous variables (to avoid conflicts)
       if (
         this.arity > 0 &&
         this.arity < term.arity &&
         this.items[this.items.length - 1] instanceof KVariable
       ) {
-        const commonLength = this.items.length - 1;
         const lastVar = this.items[this.items.length - 1] as KVariable;
+        const commonLength = this.items.length - 1;
+
+        // Check if the last variable appears earlier in the pattern
+        // If it does, we can't use the variable matching logic
+        for (let i = 0; i < commonLength; i++) {
+          if (
+            this.items[i] instanceof KVariable &&
+            (this.items[i] as KVariable).name === lastVar.name
+          ) {
+            return null; // Conflict: same variable appears multiple times
+          }
+        }
+
         let subst: Subst | null = new Subst({
           [lastVar.name]: new KSequence(term.items.slice(commonLength)),
         });
@@ -651,26 +664,10 @@ export function bottomUpWithSummary<A>(
 }
 
 export function bottomUp(f: (term: KInner) => KInner, term: KInner): KInner {
-  const stack: any[] = [term, []];
-
-  while (true) {
-    const terms = stack[stack.length - 1];
-    const currentTerm = stack[stack.length - 2];
-    const idx = terms.length - currentTerm.terms.length;
-
-    if (idx === 0) {
-      stack.pop();
-      stack.pop();
-      const transformedTerm = f(currentTerm.letTerms(terms));
-      if (stack.length === 0) {
-        return transformedTerm;
-      }
-      stack[stack.length - 1].push(transformedTerm);
-    } else {
-      stack.push(currentTerm.terms[idx]);
-      stack.push([]);
-    }
-  }
+  // Simple recursive implementation
+  const processedSubterms = term.terms.map((subterm) => bottomUp(f, subterm));
+  const reconstructedTerm = term.letTerms(processedSubterms);
+  return f(reconstructedTerm);
 }
 
 export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {

@@ -1,4 +1,4 @@
-import { hashStr } from "../utils";
+import { hashStr, mapToObject } from "../utils";
 
 export abstract class KAst {
   private _hash: string | null = null;
@@ -11,8 +11,17 @@ export abstract class KAst {
 
   public toJson(): string {
     const dictMap = this.toDict();
-    const obj = Object.fromEntries(dictMap);
+    const obj = mapToObject(dictMap);
     return JSON.stringify(obj, Object.keys(obj).sort());
+  }
+
+  public toString(): string {
+    return JSON.stringify(this.toJson());
+  }
+
+  public equals(other: KAst): boolean {
+    // Simple structural equality check using JSON serialization
+    return JSON.stringify(this.toJson()) === JSON.stringify(other.toJson());
   }
 
   public get hash(): string {

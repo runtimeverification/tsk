@@ -517,6 +517,7 @@ export class KSequence extends KInner {
         const lastVar = this.items[this.items.length - 1] as KVariable;
         const commonLength = this.items.length - 1;
 
+        /*
         // Check if the last variable appears earlier in the pattern
         // If it does, we can't use the variable matching logic
         for (let i = 0; i < commonLength; i++) {
@@ -527,6 +528,7 @@ export class KSequence extends KInner {
             return null; // Conflict: same variable appears multiple times
           }
         }
+        */
 
         let subst: Subst | null = new Subst({
           [lastVar.name]: new KSequence(term.items.slice(commonLength)),
@@ -663,11 +665,27 @@ export function bottomUpWithSummary<A>(
   }
 }
 
-export function bottomUp(f: (term: KInner) => KInner, term: KInner): KInner {
-  // Simple recursive implementation
-  const processedSubterms = term.terms.map((subterm) => bottomUp(f, subterm));
-  const reconstructedTerm = term.letTerms(processedSubterms);
-  return f(reconstructedTerm);
+export function bottomUp(f: (term: KInner) => KInner, kinner: KInner): KInner {
+  const stack: any[] = [kinner, []];
+
+  while (true) {
+    const terms = stack[stack.length - 1];
+    const term = stack[stack.length - 2];
+    const idx = terms.length - term.terms.length;
+
+    if (idx === 0) {
+      stack.pop();
+      stack.pop();
+      const transformedTerm = f(term.letTerms(terms));
+      if (!stack || stack.length === 0) {
+        return transformedTerm;
+      }
+      stack[stack.length - 1].push(transformedTerm);
+    } else {
+      stack.push(term.terms[idx]);
+      stack.push([]);
+    }
+  }
 }
 
 export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {

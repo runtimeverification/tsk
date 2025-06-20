@@ -49,7 +49,7 @@ export function indexedRewrite(
   let origKast: KInner = kast;
   let newKast: KInner | null = null;
 
-  while (origKast !== newKast) {
+  while (newKast === null || !origKast.equals(newKast)) {
     if (newKast === null) {
       newKast = origKast;
     } else {

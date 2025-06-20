@@ -964,6 +964,11 @@ export function objectToMap(obj: any): any {
   return obj;
 }
 
+/**
+ * Map a Map or array to a plain JavaScript object.
+ * @param map
+ * @returns
+ */
 export function mapToObject(map: any): any {
   // Handle non-Map/array values (primitives, dates, etc.)
   if (!(map instanceof Map) && !Array.isArray(map)) {
@@ -982,4 +987,33 @@ export function mapToObject(map: any): any {
     obj[key] = mapToObject(value); // Recurse for nested Maps/arrays
   }
   return obj;
+}
+
+/**
+ * Map an object to a Python-like string representation.
+ * @param obj
+ * @returns
+ */
+export function toPythonLikeString(obj: any): any {
+  if (typeof obj === "string") {
+    // If string contains single quotes, wrap in double quotes
+    if (obj.includes("'")) {
+      return `"${obj}"`;
+    }
+    // Otherwise, use single quotes
+    return `'${obj}'`;
+  }
+
+  if (typeof obj !== "object" || obj === null) {
+    return String(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return `[${obj.map(toPythonLikeString).join(", ")}]`;
+  }
+
+  const entries: any = Object.entries(obj).map(
+    ([key, value]) => `${toPythonLikeString(key)}: ${toPythonLikeString(value)}`
+  );
+  return `{${entries.join(", ")}}`;
 }

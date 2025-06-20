@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Token } from "../../src/kast/lexer";
-import { TokenType, lexer } from "../../src/kast/lexer";
+import type { Token } from "../../../kast/lexer";
+import { TokenType, lexer } from "../../../kast/lexer";
 
 const TT = TokenType;
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AttEntry } from "../../src/kast/att";
-import { Atts, KAtt } from "../../src/kast/att";
+import type { AttEntry } from "../../../kast/att";
+import { Atts, KAtt } from "../../../kast/att";
 
 const PRETTY_TEST_DATA: Array<[string, AttEntry[], string]> = [
   ["empty", [], ""],

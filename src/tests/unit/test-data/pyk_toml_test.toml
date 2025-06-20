@@ -1,0 +1,17 @@
+[coverage]
+output = "default-file"
+definition = "/tmp"
+
+[print]
+input = "kast-json"
+no-minimize = true
+
+[prove-legacy.default]
+kArgs = ["arg 1","args 2"]
+
+[prove-legacy.verbose]
+verbose = true
+
+[coverage.a_profile]
+verbose = true
+output = "a-profile-file"

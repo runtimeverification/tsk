@@ -443,6 +443,24 @@ export class KRewrite extends KInner {
   public apply(term: KInner): KInner {
     return bottomUp((t: KInner) => this.applyTop(t), term);
   }
+
+  public replaceTop(term: KInner): KInner {
+    /**
+     * Similar to applyTop but using exact syntactic matching instead of pattern matching.
+     */
+    const isMatch = this.lhs.equals(term);
+    if (isMatch) {
+      return this.rhs;
+    }
+    return term;
+  }
+
+  public replace(term: KInner): KInner {
+    /**
+     * Similar to apply but using exact syntactic matching instead of pattern matching.
+     */
+    return bottomUp((t: KInner) => this.replaceTop(t), term);
+  }
 }
 
 export class KSequence extends KInner {
@@ -606,10 +624,14 @@ export class Subst {
 
     // Add from other, checking for conflicts
     for (const [k, v] of other._subst.entries()) {
-      if (result.has(k) && !this.termsEqual(result.get(k)!, v)) {
-        return null;
+      if (result.has(k)) {
+        const existing = result.get(k)!;
+        if (!this.termsEqual(existing, v)) {
+          return null; // Conflict detected
+        }
+      } else {
+        result.set(k, v);
       }
-      result.set(k, v);
     }
 
     return new Subst(result);
@@ -627,8 +649,107 @@ export class Subst {
   }
 
   private termsEqual(t1: KInner, t2: KInner): boolean {
-    // Simplified equality check - would need full implementation
+    // Two terms are equal if they have the same structure and content
+    if (t1 instanceof KVariable && t2 instanceof KVariable) {
+      return t1.name === t2.name && 
+             ((t1.sort === null && t2.sort === null) || 
+              (t1.sort !== null && t2.sort !== null && t1.sort.name === t2.sort.name));
+    }
+    
+    // For other types, use structural equality
     return JSON.stringify(t1.toDict()) === JSON.stringify(t2.toDict());
+  }
+
+  public unapply(term: KInner): KInner {
+    /**
+     * Replace occurrences of valuations from this Subst with the variables that they are assigned to.
+     */
+    let newTerm = term;
+    for (const [varName, value] of this._subst.entries()) {
+      const lhs = value;
+      const rhs = new KVariable(varName);
+      const rewrite = new KRewrite(lhs, rhs);
+      newTerm = rewrite.replace(newTerm);
+    }
+    return newTerm;
+  }
+
+  public static from_pred(pred: KInner): Subst {
+    /**
+     * Given a generic matching logic predicate, attempt to extract a Subst from it.
+     */
+    const subst: Record<string, KInner> = {};
+
+    // Check if the predicate is an mlOr (wrong connective)
+    if (pred instanceof KApply && pred.label.name === "#Or") {
+      throw new Error(`Invalid substitution predicate: wrong connective ${pred}`);
+    }
+
+    for (const conjunct of flattenLabel("#And", pred)) {
+      if (
+        conjunct instanceof KApply &&
+        conjunct.label.name === "#Equals" &&
+        conjunct.args.length === 2
+      ) {
+        const lhs = conjunct.args[0]!;
+        const rhs = conjunct.args[1]!;
+        if (lhs instanceof KVariable) {
+          subst[lhs.name] = rhs;
+        } else {
+          throw new Error(`Invalid substitution predicate: ${conjunct}`);
+        }
+      } else if (
+        conjunct instanceof KApply &&
+        conjunct.label.name === "#Equals" &&
+        conjunct.args.length === 2 &&
+        conjunct.args[0] instanceof KToken && 
+        conjunct.args[0].token === "true"
+      ) {
+        // This handles mlEqualsTrue cases - these are not valid for substitution extraction
+        throw new Error(`Invalid substitution predicate: ${conjunct}`);
+      } else {
+        throw new Error(`Invalid substitution predicate: ${conjunct}`);
+      }
+    }
+
+    return new Subst(subst);
+  }
+
+  public compose(other: Subst): Subst {
+    /**
+     * Union two substitutions together, preferring the assignments in this if present in both.
+     * This is the Python compose implementation: from_other = ((k, self(v)) for k, v in other.items())
+     */
+    const result: Record<string, KInner> = {};
+
+    // First add all mappings from other, applying this substitution to their values
+    for (const [k, v] of other._subst.entries()) {
+      result[k] = this.apply(v);
+    }
+
+    // Then add mappings from this that are not in other
+    for (const [k, v] of this._subst.entries()) {
+      if (!other._subst.has(k)) {
+        result[k] = v;
+      }
+    }
+
+    return new Subst(result);
+  }
+
+  public minimize(): Subst {
+    /**
+     * Return a new substitution with any identity items removed (x -> x mappings).
+     */
+    const result: Record<string, KInner> = {};
+
+    for (const [k, v] of this._subst.entries()) {
+      if (!(v instanceof KVariable && v.name === k)) {
+        result[k] = v;
+      }
+    }
+
+    return new Subst(result);
   }
 }
 
@@ -773,7 +894,15 @@ export function buildAssoc(
   const termArray = Array.from(terms).reverse();
 
   for (const term of termArray) {
-    if (JSON.stringify(term.toDict()) === JSON.stringify(unit.toDict())) {
+    // Use a more robust comparison than JSON.stringify
+    // Check if the term is structurally the same as the unit
+    const isUnitTerm = term instanceof KApply && 
+                       unit instanceof KApply &&
+                       term.label.name === unit.label.name &&
+                       term.args.length === unit.args.length &&
+                       term.args.length === 0; // For #Top, #Bottom etc.
+    
+    if (isUnitTerm) {
       continue;
     }
     if (result === null) {

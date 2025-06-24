@@ -12,7 +12,7 @@ export abstract class KAst {
   public toJson(): string {
     const dictMap = this.toDict();
     const obj = mapToObject(dictMap);
-    return JSON.stringify(obj, Object.keys(obj).sort());
+    return JSON.stringify(obj);
   }
 
   public toString(): string {

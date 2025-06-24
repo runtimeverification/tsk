@@ -380,7 +380,9 @@ export function extractSubst(term: KInner): [Subst, KInner] {
     return null;
   }
 
-  for (const conjunct of flattenLabel("#And", term)) {
+  const flattenedTerms = flattenLabel("#And", term);
+
+  for (const conjunct of flattenedTerms) {
     if (conjunct instanceof KApply && conjunct.label.name === "#Equals") {
       const conjunctSubst = extractSubstInner(
         conjunct.args[0]!,
@@ -395,6 +397,16 @@ export function extractSubst(term: KInner): [Subst, KInner] {
     } else {
       remConjuncts.push(conjunct);
     }
+  }
+
+  // If there's only one term and it's not an #And, return the original term when no substitutions found
+  if (flattenedTerms.length === 1 && Object.keys(subst).length === 0) {
+    return [new Subst(subst), term];
+  }
+
+  // If no remaining conjuncts after extracting substitutions, return mlTop()
+  if (remConjuncts.length === 0) {
+    return [new Subst(subst), mlTop()];
   }
 
   return [new Subst(subst), mlAnd(remConjuncts)];

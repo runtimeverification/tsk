@@ -31,24 +31,15 @@ const COMPOSE_TEST_DATA: Array<
 describe("Subst.compose", () => {
   COMPOSE_TEST_DATA.forEach(([subst1, subst2, expected], i) => {
     test(`compose ${i}`, () => {
-      // Compose using union and apply, since JS Subst does not have * or minimize
-      // Compose: s1 * s2 = s1.apply(s2).union(s2)
       const s1 = new Subst(subst1);
       const s2 = new Subst(subst2);
-      // Compose: apply s2 to s1, then union with s2
+      const composed = s1.compose(s2).minimize();
+      
       const composedMap: Record<string, any> = {};
-      for (const k of Object.keys(subst1)) {
-        composedMap[k] = s2.apply(subst1[k]);
+      for (const [k, v] of composed.entries()) {
+        composedMap[k] = v;
       }
-      for (const k of Object.keys(subst2)) {
-        if (!(k in composedMap)) composedMap[k] = subst2[k];
-      }
-      // Remove identity mappings (x -> x)
-      for (const k of Object.keys(composedMap)) {
-        if (composedMap[k] instanceof KVariable && composedMap[k].name === k) {
-          delete composedMap[k];
-        }
-      }
+      
       expect(composedMap).toEqual(expected);
     });
   });
@@ -184,6 +175,7 @@ test("propagate_subst", () => {
   const term_wo_subst = mlAnd([config, other_conjunct]);
 
   const [subst, _] = extractSubst(term);
+  
   // @ts-ignore: unapply may not exist in JS impl
   const actual = subst.unapply?.(term_wo_subst);
 

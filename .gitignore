@@ -15,3 +15,5 @@ test
 
 pyk
 pyk*
+debug*.js
+test*.js

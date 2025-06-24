@@ -517,7 +517,6 @@ export class KSequence extends KInner {
         const lastVar = this.items[this.items.length - 1] as KVariable;
         const commonLength = this.items.length - 1;
 
-        /*
         // Check if the last variable appears earlier in the pattern
         // If it does, we can't use the variable matching logic
         for (let i = 0; i < commonLength; i++) {
@@ -528,7 +527,6 @@ export class KSequence extends KInner {
             return null; // Conflict: same variable appears multiple times
           }
         }
-        */
 
         let subst: Subst | null = new Subst({
           [lastVar.name]: new KSequence(term.items.slice(commonLength)),

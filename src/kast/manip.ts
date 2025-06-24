@@ -560,7 +560,9 @@ export function pushDownRewrites(kast: KInner): KInner {
         rhs.arity > 0
       ) {
         if (lhs.arity === 1 && rhs.arity === 1) {
-          return pushDownRewritesInner(new KRewrite(lhs.items[0]!, rhs.items[0]!));
+          return pushDownRewritesInner(
+            new KRewrite(lhs.items[0]!, rhs.items[0]!)
+          );
         }
         if (lhs.items[0] === rhs.items[0]) {
           const lowerRewrite = pushDownRewritesInner(

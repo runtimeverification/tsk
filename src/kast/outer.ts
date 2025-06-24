@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import { FrozenDict, notNone, single } from "../utils";
-import { Atts, EMPTY_ATT, KAtt, type WithKAtt } from "./att";
+import { Atts, EMPTY_ATT, Format, KAtt, type WithKAtt } from "./att";
 import {
   KApply,
   KInner,
@@ -353,8 +353,7 @@ export class KProduction extends KSentence {
     );
   }
 
-  public get defaultFormat(): any {
-    // Simplified implementation - would need full Format class
+  public get defaultFormat(): Format {
     let formatStr: string;
     if (this.isRecord) {
       const tokens: string[] = [];
@@ -388,8 +387,7 @@ export class KProduction extends KSentence {
       ).join(" ");
     }
 
-    // Return a simple format object - would need full Format.parse implementation
-    return { tokens: formatStr.split(" ") };
+    return Format.parse(formatStr);
   }
 }
 

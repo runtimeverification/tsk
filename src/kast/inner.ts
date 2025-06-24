@@ -651,11 +651,15 @@ export class Subst {
   private termsEqual(t1: KInner, t2: KInner): boolean {
     // Two terms are equal if they have the same structure and content
     if (t1 instanceof KVariable && t2 instanceof KVariable) {
-      return t1.name === t2.name && 
-             ((t1.sort === null && t2.sort === null) || 
-              (t1.sort !== null && t2.sort !== null && t1.sort.name === t2.sort.name));
+      return (
+        t1.name === t2.name &&
+        ((t1.sort === null && t2.sort === null) ||
+          (t1.sort !== null &&
+            t2.sort !== null &&
+            t1.sort.name === t2.sort.name))
+      );
     }
-    
+
     // For other types, use structural equality
     return JSON.stringify(t1.toDict()) === JSON.stringify(t2.toDict());
   }
@@ -682,7 +686,9 @@ export class Subst {
 
     // Check if the predicate is an mlOr (wrong connective)
     if (pred instanceof KApply && pred.label.name === "#Or") {
-      throw new Error(`Invalid substitution predicate: wrong connective ${pred}`);
+      throw new Error(
+        `Invalid substitution predicate: wrong connective ${pred}`
+      );
     }
 
     for (const conjunct of flattenLabel("#And", pred)) {
@@ -702,7 +708,7 @@ export class Subst {
         conjunct instanceof KApply &&
         conjunct.label.name === "#Equals" &&
         conjunct.args.length === 2 &&
-        conjunct.args[0] instanceof KToken && 
+        conjunct.args[0] instanceof KToken &&
         conjunct.args[0].token === "true"
       ) {
         // This handles mlEqualsTrue cases - these are not valid for substitution extraction
@@ -894,15 +900,8 @@ export function buildAssoc(
   const termArray = Array.from(terms).reverse();
 
   for (const term of termArray) {
-    // Use a more robust comparison than JSON.stringify
-    // Check if the term is structurally the same as the unit
-    const isUnitTerm = term instanceof KApply && 
-                       unit instanceof KApply &&
-                       term.label.name === unit.label.name &&
-                       term.args.length === unit.args.length &&
-                       term.args.length === 0; // For #Top, #Bottom etc.
-    
-    if (isUnitTerm) {
+    // Check if the term is the same as the unit using the equals method
+    if (term.equals(unit)) {
       continue;
     }
     if (result === null) {

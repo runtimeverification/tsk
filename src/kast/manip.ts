@@ -545,7 +545,7 @@ export function pushDownRewrites(kast: KInner): KInner {
       if (
         lhs instanceof KApply &&
         rhs instanceof KApply &&
-        lhs.label === rhs.label &&
+        lhs.label.name === rhs.label.name &&
         lhs.arity === rhs.arity
       ) {
         const newArgs = lhs.args.map(
@@ -560,7 +560,7 @@ export function pushDownRewrites(kast: KInner): KInner {
         rhs.arity > 0
       ) {
         if (lhs.arity === 1 && rhs.arity === 1) {
-          return new KRewrite(lhs.items[0]!, rhs.items[0]!);
+          return pushDownRewritesInner(new KRewrite(lhs.items[0]!, rhs.items[0]!));
         }
         if (lhs.items[0] === rhs.items[0]) {
           const lowerRewrite = pushDownRewritesInner(

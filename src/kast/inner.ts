@@ -821,9 +821,10 @@ export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {
   while (true) {
     const terms = stack[stack.length - 1];
     const currentTerm = stack[stack.length - 2];
-    const idx = terms.length - currentTerm.terms.length;
+    const idx = terms.length; // The next child index to process
 
-    if (idx === 0) {
+    if (idx === currentTerm.terms.length) {
+      // We've processed all children
       stack.pop();
       stack.pop();
       const termWithNewChildren = currentTerm.letTerms(terms);
@@ -832,6 +833,7 @@ export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {
       }
       stack[stack.length - 1].push(termWithNewChildren);
     } else {
+      // Process the next child
       stack.push(f(currentTerm.terms[idx]));
       stack.push([]);
     }

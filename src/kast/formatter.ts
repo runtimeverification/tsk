@@ -106,8 +106,7 @@ export class Formatter {
       production = syntaxSymbols.get(kapply.label.name)!;
     }
 
-    const format =
-      production.att.get(Atts.FORMAT) || production.defaultFormat();
+    const format = production.att.get(Atts.FORMAT) || production.defaultFormat;
     const result: string[] = [];
 
     for (const token of format.tokens) {

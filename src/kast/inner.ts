@@ -671,9 +671,10 @@ export function bottomUp(f: (term: KInner) => KInner, kinner: KInner): KInner {
   while (true) {
     const terms = stack[stack.length - 1];
     const term = stack[stack.length - 2];
-    const idx = terms.length - term.terms.length;
+    const idx = terms.length; // The next child index to process
 
-    if (idx === 0) {
+    if (idx === term.terms.length) {
+      // We've processed all children
       stack.pop();
       stack.pop();
       const transformedTerm = f(term.letTerms(terms));
@@ -682,6 +683,7 @@ export function bottomUp(f: (term: KInner) => KInner, kinner: KInner): KInner {
       }
       stack[stack.length - 1].push(transformedTerm);
     } else {
+      // Process the next child
       stack.push(term.terms[idx]);
       stack.push([]);
     }

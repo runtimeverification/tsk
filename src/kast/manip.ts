@@ -959,17 +959,88 @@ export function buildClaim(
   finalConstraints: Iterable<KInner> = [],
   keepVars: Iterable<string> = []
 ): [KClaim, Subst] {
-  const [rule, varMap] = buildRule(
-    claimId,
-    initConfig,
-    finalConfig,
-    initConstraints,
-    finalConstraints,
-    undefined,
-    keepVars
+  // For claims, we need to handle ML predicates differently than rules
+  // Claims should preserve ML predicates, not convert them to boolean expressions
+
+  let initConstraintsList = Array.from(initConstraints).map(normalizeMlPred);
+  let finalConstraintsList = Array.from(finalConstraints).map(normalizeMlPred);
+  finalConstraintsList = finalConstraintsList.filter(
+    (c) => !initConstraintsList.includes(c)
   );
-  const claim = new KClaim(rule.body, rule.requires, rule.ensures, rule.att);
-  return [claim, varMap];
+
+  const initTerm = mlAnd([initConfig, ...initConstraintsList]);
+  const finalTerm = mlAnd([finalConfig, ...finalConstraintsList]);
+
+  const lhsVars = freeVars(initTerm);
+  const rhsVars = freeVars(finalTerm);
+  const occurrences = varOccurrences(
+    mlAnd(
+      [
+        pushDownRewrites(new KRewrite(initConfig, finalConfig)),
+        ...initConstraintsList,
+        ...finalConstraintsList,
+      ],
+      GENERATED_TOP_CELL
+    )
+  );
+  const sortedVars = keepVarsSorted(occurrences);
+  const vSubst: Record<string, KVariable> = {};
+  const vremapSubst: Record<string, KVariable> = {};
+
+  for (const [v, vars] of occurrences.entries()) {
+    let newV = v;
+    if (vars.length === 1) {
+      newV = "_" + newV;
+    }
+    if (rhsVars.has(v) && !lhsVars.has(v)) {
+      newV = "?" + newV;
+    }
+    if (newV !== v) {
+      vSubst[v] = new KVariable(newV, sortedVars.get(v)?.sort);
+      vremapSubst[newV] = sortedVars.get(v)!;
+    }
+  }
+
+  const newInitConfig = new Subst(vSubst).apply(initConfig);
+  const newInitConstraints = initConstraintsList.map((c) =>
+    new Subst(vSubst).apply(c)
+  );
+  const [newFinalConfig, newFinalConstraints] = applyExistentialSubstitutions(
+    new Subst(vSubst).apply(finalConfig),
+    finalConstraintsList.map((c) => new Subst(vSubst).apply(c))
+  );
+
+  const claimBody = pushDownRewrites(
+    new KRewrite(newInitConfig, newFinalConfig)
+  );
+
+  // Helper function to extract constraints from mlEqualsTrue expressions
+  function extractConstraintFromMlEqualsTrue(constraint: KInner): KInner {
+    if (
+      constraint instanceof KApply &&
+      constraint.label.name === "#Equals" &&
+      constraint.args.length === 2 &&
+      constraint.args[0] === TRUE
+    ) {
+      return constraint.args[1]!;
+    }
+    return constraint;
+  }
+
+  // For claims, extract the raw constraints from mlEqualsTrue expressions
+  const claimRequires =
+    newInitConstraints.length > 0
+      ? extractConstraintFromMlEqualsTrue(newInitConstraints[0]!)
+      : mlTop();
+  const claimEnsures =
+    newFinalConstraints.length > 0
+      ? extractConstraintFromMlEqualsTrue(newFinalConstraints[0]!)
+      : mlTop();
+
+  const claimAtt = new KAtt([Atts.LABEL.call(claimId)]);
+  const claim = new KClaim(claimBody, claimRequires, claimEnsures, claimAtt);
+
+  return [claim, new Subst(vremapSubst)];
 }
 
 export function buildRule(

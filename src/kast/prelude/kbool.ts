@@ -1,5 +1,5 @@
-import { unique } from "../../utils.ts";
-import { KApply, KInner, KLabel, KSort, KToken, buildAssoc } from "../inner.ts";
+import { unique } from "../../utils";
+import { KApply, KInner, KLabel, KSort, KToken, buildAssoc } from "../inner";
 
 // TODO: Import from outer module when available
 export const BOOL = new KSort("Bool");

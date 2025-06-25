@@ -1,4 +1,4 @@
-import { deQuoteString } from "../dequote.ts";
+import { deQuoteString } from "../dequote";
 import { Loc, Token, TokenType, outerLexer } from "./outer_lexer";
 import {
   Alias,

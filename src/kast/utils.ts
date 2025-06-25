@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { astToKast } from "./_ast_to_kast.ts";
+import { astToKast } from "./_ast_to_kast";
 import { selectCodeBlocks } from "./markdown";
 import { KDefinition } from "./outer";
 import { OuterParser } from "./outer_parser";

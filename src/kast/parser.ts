@@ -1,5 +1,5 @@
 import { KApply, KInner, KLabel, KSequence, KToken, KVariable } from "./inner";
-import { lexer, Token, TokenType } from "./lexer";
+import { lexer, type Token, TokenType } from "./lexer";
 
 const TT = TokenType;
 
@@ -73,6 +73,7 @@ export class KAstParser {
       case TT.VARIABLE: {
         const name = this._consume();
         let sort: string | undefined = undefined;
+        // @ts-ignore
         if (this._la.type === TT.COLON) {
           this._consume();
           sort = this._match(TT.SORT);

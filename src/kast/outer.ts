@@ -14,7 +14,7 @@ import {
   topDown,
 } from "./inner";
 import { KAst, kastTerm } from "./kast";
-import { indexedRewrite } from "./rewrite.ts";
+import { indexedRewrite } from "./rewrite";
 
 const BOOL = new KSort("Bool");
 const TRUE = new KToken("true", BOOL);

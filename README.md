@@ -13,3 +13,9 @@ $ bun install
 ```bash
 $ bun test
 ```
+
+## Build 
+
+```bash
+$ bun run build
+```

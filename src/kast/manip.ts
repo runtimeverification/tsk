@@ -921,8 +921,8 @@ export function normalizeConstraints(constraints: Iterable<KInner>): KInner[] {
     constraintList.push(...flattenLabel("#And", constraint));
   }
   const constraintList2 = unique(constraintList);
-  const constraintList3 = constraintList2.filter(
-    (c) => !isSpuriousConstraint(c)
+  const constraintList3 = Array.from(constraintList2).filter(
+    (c: KInner) => !isSpuriousConstraint(c)
   );
   return Array.from(constraintList3);
 }

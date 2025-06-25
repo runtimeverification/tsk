@@ -17,3 +17,8 @@ pyk
 pyk*
 debug*.js
 test*.js
+dist
+
+# Ignore compiled JS files in src (they should only be in dist)
+src/**/*.js
+src/**/*.js.map

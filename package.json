@@ -49,6 +49,7 @@
     "build:esbuild": "node build.cjs",
     "prepack": "npm run build",
     "prepublish": "npm run build",
+    "postinstall": "npm run build",
     "test": "bun test",
     "test:unit": "bun test src/tests/unit",
     "test:integration": "bun test src/tests/integration",

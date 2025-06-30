@@ -25,6 +25,7 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false,
     // typings generation
+    "rootDir": "./src/",
     "outDir": "./dist/types/",
     "declaration": true,
     "emitDeclarationOnly": true,
@@ -37,5 +38,6 @@
     "node_modules",
     "dist",
     "build.cjs",
+    "src/tests/**/*",
   ]
 }

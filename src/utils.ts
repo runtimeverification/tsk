@@ -388,7 +388,7 @@ export function hashFile(
   chunkSize: number = 64 * 1024
 ): string {
   const hash = crypto.createHash("sha256");
-  const data = fs.readFileSync(filePath);
+  const data = fs.readFileSync(filePath, "utf-8");
   hash.update(data);
   return hash.digest("hex");
 }

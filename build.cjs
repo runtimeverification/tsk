@@ -21,8 +21,8 @@ const sharedConfig = {
     "url",
     "crypto",
     // === from package.json
-    ...Object.keys(dependencies),
-    ...Object.keys(devDependencies),
+    ...Object.keys(dependencies ?? {}),
+    ...Object.keys(devDependencies ?? {}),
   ],
 };
 

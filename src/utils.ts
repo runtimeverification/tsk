@@ -1,8 +1,7 @@
 import * as crypto from "crypto";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
-import * as tar from "tar";
+// import * as tar from "tar";
 
 // Generic type variables
 export type Hashable = any; // string | number | boolean;
@@ -798,6 +797,8 @@ export function checkRelativePath(filePath: string): void {
   }
 }
 
+/*
+// NOTE: Yiyi: We disable this class for now. Because using "tar" is causing problem in "kaas" next.js
 // Bug report functionality
 export class BugReport {
   private bugReport: string;
@@ -902,6 +903,7 @@ export class BugReport {
     this.commandId++;
   }
 }
+*/
 
 // Tuple manipulation utilities
 export function tupleOf<T extends readonly unknown[]>(

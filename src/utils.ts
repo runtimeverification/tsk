@@ -939,7 +939,6 @@ export function caseFunction<P, R>(
 }
 
 // Additional utility functions that might be referenced elsewhere
-export const ROOT = path.dirname(path.dirname(__filename));
 
 export function none(_: any): void {
   // Do nothing function

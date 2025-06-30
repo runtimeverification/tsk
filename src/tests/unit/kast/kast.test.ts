@@ -37,7 +37,7 @@ describe("KVariable", () => {
     {
       testId: "sort",
       variable: new KVariable("Foo", new KSort("Int")),
-      dict: new Map([
+      dict: new Map<string, string | Map<string, string>>([
         ["node", "KVariable"],
         ["name", "Foo"],
         [

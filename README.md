@@ -1,4 +1,4 @@
-# kframework-js
+# tsk
 
 Please install [bun](https://bun.sh/).
 

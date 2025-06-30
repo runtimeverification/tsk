@@ -2,6 +2,7 @@
 with pkgs;
 mkShell rec {
   buildInputs = [
+    nodejs_22 # This is necessary for npm
     bun
     python3
   ];

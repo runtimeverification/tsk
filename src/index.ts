@@ -3,3 +3,4 @@
 
 export * from "./cterm";
 export * from "./kast";
+export { mapToObject, objectToMap } from "./utils";

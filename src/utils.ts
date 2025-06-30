@@ -1,4 +1,3 @@
-import * as child_process from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
@@ -559,6 +558,9 @@ export interface CompletedProcess {
   stderr: string;
 }
 
+/*
+// NOTE: Yiyi: I disabled the functions that require "child_process" for now.
+//             It causes problem importing "tsk" in "kaas"
 export function runProcess(
   args: string | string[],
   options: RunProcessOptions = {}
@@ -763,6 +765,7 @@ function subprocessRun(
     child.on("error", reject);
   }) as any; // Type assertion for sync-like usage in translated code
 }
+*/
 
 export function exitWithProcessError(error: {
   returncode: number;

@@ -1,8 +1,9 @@
 name: Publish the patch release
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
+  push:
+    branches:
+      - develop
 jobs:
   build-and-test:
     runs-on: [self-hosted, linux, flyweight]

@@ -6,7 +6,7 @@ on:
       - master
 jobs:
   build-and-test:
-    uses: ./.github/workflows/build-and-test.yml
+    uses: ./.github/actions/build-and-test.yml
 
   publish-minor-release:
     needs: [build-and-test]

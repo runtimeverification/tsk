@@ -1,16 +1,11 @@
-name: Build
+name: Build and Test
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-jobs:
-  test:
-    runs-on: [self-hosted, linux, flyweight]
+  workflow_call:
 
+jobs:
+  build-and-tests:
+    runs-on: [self-hosted, linux, flyweight]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -21,7 +16,10 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
+
+      - name: Run build
+        run: bun run build
 
       - name: Run tests
-        run: bun run build
+        run: bun test --timeout 10000

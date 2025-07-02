@@ -6,11 +6,14 @@ on:
       - master
 jobs:
   build-and-test:
-    uses: ./.github/actions/build-and-test.yml
+    runs-on: [self-hosted, linux, flyweight]
+    steps:
+      - name: "Build and test"
+        uses: ./.github/actions/build-and-test.yml
 
   publish-minor-release:
     needs: [build-and-test]
-    runs-on: [self-hosted, linux, normal]
+    runs-on: [self-hosted, linux, flyweight]
     steps:
       - uses: actions/checkout@v3
         with:

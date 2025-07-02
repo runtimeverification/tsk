@@ -3,7 +3,7 @@ name: Publish the minor release
 on:
   push:
     branches:
-      - main
+      - master
 jobs:
   publish-minor-release:
     runs-on: [self-hosted, linux, normal]

@@ -94,6 +94,57 @@ export abstract class KInner extends KAst {
     return KInner.fromDict(JSON.parse(s));
   }
 
+  public static async fromJsonAsync(s: string): Promise<KInner> {
+    return KInner.fromDictAsync(JSON.parse(s));
+  }
+
+  // Async version to break up call stack using Promises
+  public static async fromDictAsync(
+    dct: Record<string, any>,
+    depth = 0
+  ): Promise<KInner> {
+    // Every few levels, yield control to prevent stack overflow
+    if (depth % 10 === 0 && depth > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const nodeType = dct.node;
+    switch (nodeType) {
+      case "KToken":
+        return KToken._fromDict(dct, []);
+      case "KVariable":
+        return KVariable._fromDict(dct, []);
+      case "KApply":
+        const args = await Promise.all(
+          (dct.args || []).map((arg: any) =>
+            KInner.fromDictAsync(arg, depth + 1)
+          )
+        );
+        return KApply._fromDict(dct, args);
+      case "KSequence":
+        const items = await Promise.all(
+          (dct.items || []).map((item: any) =>
+            KInner.fromDictAsync(item, depth + 1)
+          )
+        );
+        return KSequence._fromDict(dct, items);
+      case "KRewrite":
+        const [lhs, rhs] = await Promise.all([
+          KInner.fromDictAsync(dct.lhs, depth + 1),
+          KInner.fromDictAsync(dct.rhs, depth + 1),
+        ]);
+        return KRewrite._fromDict(dct, [lhs, rhs]);
+      case "KAs":
+        const [pattern, alias] = await Promise.all([
+          KInner.fromDictAsync(dct.pattern, depth + 1),
+          KInner.fromDictAsync(dct.alias, depth + 1),
+        ]);
+        return KAs._fromDict(dct, [pattern, alias]);
+      default:
+        throw new Error(`Unknown node type: ${nodeType}`);
+    }
+  }
+
   public static fromDict(dct: Record<string, any>): KInner {
     // Simplified implementation - in practice would need full parsing logic
     const nodeType = dct.node;

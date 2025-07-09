@@ -122,6 +122,54 @@ export class CTermShow {
   }
 
   /**
+   * Generate a string representation of the configuration part of a CTerm asynchronously.
+   * This prevents stack overflow errors when dealing with deeply nested configurations.
+   *
+   * @param cterm - The CTerm whose configuration should be displayed.
+   * @param yieldFrequency - How often to yield control (default: 10).
+   * @returns A promise that resolves to an array of strings representing the formatted configuration.
+   */
+  public async showConfigAsync(
+    cterm: CTerm,
+    yieldFrequency: number = 10
+  ): Promise<string[]> {
+    let workingCterm = cterm;
+
+    if (this._breakCellCollections) {
+      workingCterm = new CTerm(
+        await this._topDownAsync(
+          (kast) => this._breakCellsVisitor(kast),
+          cterm.config,
+          0,
+          yieldFrequency
+        ),
+        cterm.constraints
+      );
+    }
+
+    if (this._omitLabels.length > 0) {
+      workingCterm = new CTerm(
+        await this._topDownAsync(
+          (kast) => this._omitLabelsVisitor(kast),
+          workingCterm.config,
+          0,
+          yieldFrequency
+        ),
+        workingCterm.constraints
+      );
+    }
+
+    if (this._minimize) {
+      workingCterm = new CTerm(
+        minimizeTerm(workingCterm.config, freeVars(workingCterm.constraint)),
+        workingCterm.constraints
+      );
+    }
+
+    return this.printLines(workingCterm.config);
+  }
+
+  /**
    * Generate a string representation of the constraints part of a CTerm.
    *
    * @param cterm - The CTerm whose constraints should be displayed.
@@ -184,5 +232,42 @@ export class CTermShow {
       return DOTS;
     }
     return kast;
+  }
+
+  /**
+   * Asynchronous version of topDown traversal to prevent stack overflow.
+   * Similar to the fromDictAsync pattern in KInner class.
+   *
+   * @param f - The transformation function to apply to each node.
+   * @param term - The term to traverse.
+   * @param depth - Current recursion depth.
+   * @param yieldFrequency - How often to yield control.
+   * @returns A promise that resolves to the transformed term.
+   */
+  private async _topDownAsync(
+    f: (term: KInner) => KInner,
+    term: KInner,
+    depth: number = 0,
+    yieldFrequency: number = 10
+  ): Promise<KInner> {
+    // Every yieldFrequency levels, yield control to prevent stack overflow
+    if (depth % yieldFrequency === 0 && depth > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const transformedTerm = f(term);
+
+    if (transformedTerm.terms.length === 0) {
+      return transformedTerm;
+    }
+
+    // Process all child terms asynchronously
+    const transformedChildren = await Promise.all(
+      transformedTerm.terms.map((childTerm) =>
+        this._topDownAsync(f, childTerm, depth + 1, yieldFrequency)
+      )
+    );
+
+    return transformedTerm.letTerms(transformedChildren);
   }
 }

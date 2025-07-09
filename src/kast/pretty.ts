@@ -74,7 +74,7 @@ export class PrettyPrinter {
   }
 
   print(kast: KAst): string {
-    console.debug(`Unparsing: ${kast}`);
+    // console.debug(`Unparsing: ${kast}`);
 
     if (kast instanceof KAtt) {
       return this.printKAtt(kast);

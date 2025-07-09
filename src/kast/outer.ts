@@ -183,13 +183,22 @@ export abstract class KSentence extends KOuter implements WithKAtt {
         return KProduction._fromDict(d);
       case "KSyntaxSort":
         return KSyntaxSort._fromDict(d);
+      case "KSortSynonym":
+        return KSortSynonym._fromDict(d);
+      case "KSyntaxLexical":
+        return KSyntaxLexical._fromDict(d);
+      case "KSyntaxAssociativity":
+        return KSyntaxAssociativity._fromDict(d);
+      case "KSyntaxPriority":
+        return KSyntaxPriority._fromDict(d);
+      case "KBubble":
+        return KBubble._fromDict(d);
       case "KRule":
         return KRule._fromDict(d);
       case "KClaim":
         return KClaim._fromDict(d);
       case "KContext":
         return KContext._fromDict(d);
-      // Add other cases as needed
       default:
         throw new Error(`Unimplemented sentence type: ${node}`);
     }

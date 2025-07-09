@@ -102,7 +102,7 @@ export class KNonTerminal extends KProductionItem {
   }
 
   public static _fromDict(d: Record<string, any>): KNonTerminal {
-    const name = d.has("name") ? d["name"] : null;
+    const name = d["name"] ? d["name"] : null;
     return new KNonTerminal(KSort.fromDict(d["sort"]), name);
   }
 
@@ -267,9 +267,9 @@ export class KProduction extends KSentence {
   public static _fromDict(d: Record<string, any>): KProduction {
     return new KProduction(
       KSort.fromDict(d["sort"]),
-      d
-        .get("productionItems")
-        ?.map((item: any) => KProductionItem.fromDict(item)) || [],
+      d["productionItems"]?.map((item: any) =>
+        KProductionItem.fromDict(item)
+      ) || [],
       d["params"]?.map((param: any) => KSort.fromDict(param)) || [],
       d["klabel"] ? KLabel.fromDict(d["klabel"]) : null,
       d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT

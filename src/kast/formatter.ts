@@ -100,10 +100,10 @@ export class Formatter {
       production = _DEFAULT_BRACKET;
     } else {
       const syntaxSymbols = this.definition.syntaxSymbols;
-      if (!syntaxSymbols.has(kapply.label.name)) {
+      if (!(kapply.label.name in syntaxSymbols)) {
         throw new Error(`Production not found for label: ${kapply.label.name}`);
       }
-      production = syntaxSymbols.get(kapply.label.name)!;
+      production = syntaxSymbols[kapply.label.name]!;
     }
 
     const format = production.att.get(Atts.FORMAT) || production.defaultFormat;
@@ -204,7 +204,7 @@ export function addBrackets(definition: KDefinition, term: KInner): KInner {
       return term;
     }
 
-    const prod = definition.symbols.get(term.label.name);
+    const prod = definition.symbols[term.label.name];
     if (!prod) {
       throw new Error(`Production not found for label: ${term.label.name}`);
     }
@@ -247,7 +247,7 @@ function _withBracket(
     return term;
   }
 
-  const bracketProd = definition.brackets.get(bracketSort);
+  const bracketProd = definition.brackets[bracketSort.name];
   if (bracketProd) {
     const bracketLabel =
       bracketProd.att.get(Atts.BRACKET_LABEL)?.name || _DEFAULT_BRACKET_LABEL;
@@ -300,7 +300,7 @@ function _betweenTerminals(
   parent: KApply,
   index: number
 ): boolean {
-  const prod = definition.symbols.get(parent.label.name);
+  const prod = definition.symbols[parent.label.name];
   if (!prod) {
     return false;
   }
@@ -327,14 +327,14 @@ function _associativityWrong(
    */
   const parentLabel = parent.label.name;
   const termLabel = term.label.name;
-  const prod = definition.symbols.get(parentLabel);
+  const prod = definition.symbols[parentLabel];
   if (!prod) {
     return false;
   }
 
   // Check if both symbols have the same priority
-  const parentPriorities = definition.priorities.get(parentLabel) || new Set();
-  const termPriorities = definition.priorities.get(termLabel) || new Set();
+  const parentPriorities = definition.priorities[parentLabel] || new Set();
+  const termPriorities = definition.priorities[termLabel] || new Set();
 
   // If they don't have equal priority, associativity doesn't matter for bracketing
   if (
@@ -346,7 +346,7 @@ function _associativityWrong(
   }
 
   // Check left associativity constraints
-  const leftAssocs = definition.leftAssocs.get(parentLabel) || new Set();
+  const leftAssocs = definition.leftAssocs[parentLabel] || new Set();
   if (leftAssocs.has(termLabel)) {
     // Left associative symbols cannot appear as the rightmost child
     const nonTerminalPositions = prod.items
@@ -360,7 +360,7 @@ function _associativityWrong(
   }
 
   // Check right associativity constraints
-  const rightAssocs = definition.rightAssocs.get(parentLabel) || new Set();
+  const rightAssocs = definition.rightAssocs[parentLabel] || new Set();
   if (rightAssocs.has(termLabel)) {
     // Right associative symbols cannot appear as the leftmost child
     const firstNonTerminalPos = prod.items.findIndex(
@@ -386,16 +386,16 @@ function _priorityWrong(
   const termLabel = term.label.name;
 
   // Check if parent has higher priority than term
-  const parentPriorities = definition.priorities.get(parentLabel);
+  const parentPriorities = definition.priorities[parentLabel];
   if (parentPriorities && parentPriorities.has(termLabel)) {
     return true; // term has lower priority than parent, needs brackets
   }
 
   // Check overloads
-  const overloads = definition.overloads.get(parentLabel);
+  const overloads = definition.overloads[parentLabel];
   if (overloads) {
     for (const overload of overloads) {
-      const overloadPriorities = definition.priorities.get(overload);
+      const overloadPriorities = definition.priorities[overload];
       if (overloadPriorities && overloadPriorities.has(termLabel)) {
         return true;
       }

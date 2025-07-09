@@ -11,15 +11,15 @@ export class KSort extends KAst {
     this.name = name;
   }
 
-  public static fromDict(d: Map<string, any>): KSort {
-    return new KSort(d.get("name"));
+  public static fromDict(d: Record<string, any>): KSort {
+    return new KSort(d.name);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSort");
-    result.set("name", this.name);
-    return result;
+  public toDict(): Record<string, any> {
+    return {
+      node: "KSort",
+      name: this.name,
+    };
   }
 
   public let(name?: string | null): KSort {
@@ -52,22 +52,19 @@ export class KLabel extends KAst {
     );
   }
 
-  public static fromDict(d: Map<string, any>): KLabel {
+  public static fromDict(d: Record<string, any>): KLabel {
     return new KLabel(
-      d.get("name"),
-      d.get("params").map((param: any) => KSort.fromDict(param))
+      d.name,
+      d.params.map((param: any) => KSort.fromDict(param))
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KLabel");
-    result.set("name", this.name);
-    result.set(
-      "params",
-      this.params.map((param) => param.toDict())
-    );
-    return result;
+  public toDict(): Record<string, any> {
+    return {
+      node: "KLabel",
+      name: this.name,
+      params: this.params.map((param) => param.toDict()),
+    };
   }
 
   public let(
@@ -97,29 +94,28 @@ export abstract class KInner extends KAst {
     return KInner.fromDict(JSON.parse(s));
   }
 
-  public static fromDict(dct: Map<string, any>): KInner {
+  public static fromDict(dct: Record<string, any>): KInner {
     // Simplified implementation - in practice would need full parsing logic
-    const nodeType = dct.get("node");
+    const nodeType = dct.node;
     switch (nodeType) {
       case "KToken":
         return KToken._fromDict(dct, []);
       case "KVariable":
         return KVariable._fromDict(dct, []);
       case "KApply":
-        const args =
-          dct.get("args")?.map((arg: any) => KInner.fromDict(arg)) || [];
+        const args = dct.args?.map((arg: any) => KInner.fromDict(arg)) || [];
         return KApply._fromDict(dct, args);
       case "KSequence":
         const items =
-          dct.get("items")?.map((item: any) => KInner.fromDict(item)) || [];
+          dct.items?.map((item: any) => KInner.fromDict(item)) || [];
         return KSequence._fromDict(dct, items);
       case "KRewrite":
-        const lhs = KInner.fromDict(dct.get("lhs"));
-        const rhs = KInner.fromDict(dct.get("rhs"));
+        const lhs = KInner.fromDict(dct.lhs);
+        const rhs = KInner.fromDict(dct.rhs);
         return KRewrite._fromDict(dct, [lhs, rhs]);
       case "KAs":
-        const pattern = KInner.fromDict(dct.get("pattern"));
-        const alias = KInner.fromDict(dct.get("alias"));
+        const pattern = KInner.fromDict(dct.pattern);
+        const alias = KInner.fromDict(dct.alias);
         return KAs._fromDict(dct, [pattern, alias]);
       default:
         throw new Error(`Unknown node type: ${nodeType}`);
@@ -136,13 +132,13 @@ export abstract class KInner extends KAst {
   public abstract get terms(): KInner[];
   public abstract letTerms(terms: KInner[]): KInner;
   public abstract match(term: KInner): Subst | null;
-  public abstract _toDict(terms: Map<string, any>[]): Map<string, any>;
+  public abstract _toDict(terms: Record<string, any>[]): Record<string, any>;
 
   public mapInner(f: (term: KInner) => KInner): KInner {
     return this.letTerms(this.terms.map(f));
   }
 
-  public toDict(): Map<string, any> {
+  public toDict(): Record<string, any> {
     const termDicts = this.terms.map((term) => term.toDict());
     return this._toDict(termDicts);
   }
@@ -174,16 +170,16 @@ export class KToken extends KInner {
     this.sort = typeof sort === "string" ? new KSort(sort) : sort;
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KToken {
-    return new KToken(dct.get("token"), KSort.fromDict(dct.get("sort")));
+  public static _fromDict(dct: Record<string, any>, terms: KInner[]): KToken {
+    return new KToken(dct.token, KSort.fromDict(dct.sort));
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KToken");
-    result.set("token", this.token);
-    result.set("sort", this.sort.toDict());
-    return result;
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+    return {
+      node: "KToken",
+      token: this.token,
+      sort: this.sort.toDict(),
+    };
   }
 
   public let(options: { token?: string; sort?: string | KSort } = {}): KToken {
@@ -223,17 +219,21 @@ export class KVariable extends KInner {
         : sort;
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KVariable {
-    const sort = dct.get("sort") ? KSort.fromDict(dct.get("sort")) : null;
-    return new KVariable(dct.get("name"), sort);
+  public static _fromDict(
+    dct: Record<string, any>,
+    terms: KInner[]
+  ): KVariable {
+    const sort = dct.sort ? KSort.fromDict(dct.sort) : null;
+    return new KVariable(dct.name, sort);
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KVariable");
-    result.set("name", this.name);
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+    const result: Record<string, any> = {
+      node: "KVariable",
+      name: this.name,
+    };
     if (this.sort !== null) {
-      result.set("sort", this.sort.toDict());
+      result.sort = this.sort.toDict();
     }
     return result;
   }
@@ -294,18 +294,18 @@ export class KApply extends KInner {
     );
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KApply {
-    return new KApply(KLabel.fromDict(dct.get("label")), terms);
+  public static _fromDict(dct: Record<string, any>, terms: KInner[]): KApply {
+    return new KApply(KLabel.fromDict(dct.label), terms);
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KApply");
-    result.set("label", this.label.toDict());
-    result.set("args", terms);
-    result.set("arity", this.arity);
-    result.set("variable", false);
-    return result;
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+    return {
+      node: "KApply",
+      label: this.label.toDict(),
+      args: terms,
+      arity: this.arity,
+      variable: false,
+    };
   }
 
   public let(
@@ -347,18 +347,18 @@ export class KAs extends KInner {
     this.alias = alias;
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KAs {
+  public static _fromDict(dct: Record<string, any>, terms: KInner[]): KAs {
     const [pattern, alias] = terms;
     return new KAs(pattern!, alias!);
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
     const [pattern, alias] = terms;
-    const result = new Map<string, any>();
-    result.set("node", "KAs");
-    result.set("pattern", pattern);
-    result.set("alias", alias);
-    return result;
+    return {
+      node: "KAs",
+      pattern: pattern,
+      alias: alias,
+    };
   }
 
   public let(options: { pattern?: KInner; alias?: KInner } = {}): KAs {
@@ -391,18 +391,18 @@ export class KRewrite extends KInner {
     this.rhs = rhs;
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KRewrite {
+  public static _fromDict(dct: Record<string, any>, terms: KInner[]): KRewrite {
     const [lhs, rhs] = terms;
     return new KRewrite(lhs!, rhs!);
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
     const [lhs, rhs] = terms;
-    const result = new Map<string, any>();
-    result.set("node", "KRewrite");
-    result.set("lhs", lhs);
-    result.set("rhs", rhs);
-    return result;
+    return {
+      node: "KRewrite",
+      lhs: lhs,
+      rhs: rhs,
+    };
   }
 
   public let(options: { lhs?: KInner; rhs?: KInner } = {}): KRewrite {
@@ -493,16 +493,19 @@ export class KSequence extends KInner {
     return this.items.length;
   }
 
-  public static _fromDict(dct: Map<string, any>, terms: KInner[]): KSequence {
+  public static _fromDict(
+    dct: Record<string, any>,
+    terms: KInner[]
+  ): KSequence {
     return new KSequence(terms);
   }
 
-  public _toDict(terms: Map<string, any>[]): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSequence");
-    result.set("items", terms);
-    result.set("arity", this.arity);
-    return result;
+  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+    return {
+      node: "KSequence",
+      items: terms,
+      arity: this.arity,
+    };
   }
 
   public let(options: { items?: KInner[] } = {}): KSequence {
@@ -564,73 +567,73 @@ export class KSequence extends KInner {
 }
 
 export class Subst {
-  private readonly _subst: Map<string, KInner>;
+  private readonly _subst: Record<string, KInner>;
 
-  constructor(subst: Map<string, KInner> | Record<string, KInner> = new Map()) {
+  constructor(subst: Map<string, KInner> | Record<string, KInner> = {}) {
     if (subst instanceof Map) {
-      this._subst = new Map(subst);
+      this._subst = Object.fromEntries(subst);
     } else {
-      this._subst = new Map(Object.entries(subst));
+      this._subst = { ...subst };
     }
   }
 
   public get(key: string): KInner | undefined {
-    return this._subst.get(key);
+    return this._subst[key];
   }
 
   public has(key: string): boolean {
-    return this._subst.has(key);
+    return key in this._subst;
   }
 
-  public keys(): IterableIterator<string> {
-    return this._subst.keys();
+  public keys(): string[] {
+    return Object.keys(this._subst);
   }
 
-  public values(): IterableIterator<KInner> {
-    return this._subst.values();
+  public values(): KInner[] {
+    return Object.values(this._subst);
   }
 
-  public entries(): IterableIterator<[string, KInner]> {
-    return this._subst.entries();
+  public entries(): [string, KInner][] {
+    return Object.entries(this._subst);
   }
 
   public get size(): number {
-    return this._subst.size;
+    return Object.keys(this._subst).length;
   }
 
-  public static fromDict(d: Map<string, any>): Subst {
-    const entries = new Map<string, KInner>();
-    for (const [k, v] of d.entries()) {
-      entries.set(k, KInner.fromDict(v));
+  public static fromDict(d: Record<string, any>): Subst {
+    const entries: Record<string, KInner> = {};
+    for (const [k, v] of Object.entries(d)) {
+      entries[k] = KInner.fromDict(v);
     }
     return new Subst(entries);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    for (const [k, v] of this._subst.entries()) {
-      result.set(k, v.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const [k, v] of this.entries()) {
+      result[k] = v.toDict();
     }
     return result;
   }
 
   public union(other: Subst): Subst | null {
-    const result = new Map<string, KInner>();
+    const result: Record<string, KInner> = {};
 
     // Add all from this
-    for (const [k, v] of this._subst.entries()) {
-      result.set(k, v);
+    for (const [k, v] of this.entries()) {
+      result[k] = v;
     }
 
     // Add from other, checking for conflicts
-    for (const [k, v] of other._subst.entries()) {
-      if (result.has(k)) {
-        const existing = result.get(k)!;
+    for (const [k, v] of other.entries()) {
+      if (k in result) {
+        const existing = result[k]!;
         if (!this.termsEqual(existing, v)) {
           return null; // Conflict detected
         }
       } else {
-        result.set(k, v);
+        result[k] = v;
       }
     }
 
@@ -639,8 +642,8 @@ export class Subst {
 
   public apply(term: KInner): KInner {
     const replace = (t: KInner): KInner => {
-      if (t instanceof KVariable && this._subst.has(t.name)) {
-        return this._subst.get(t.name)!;
+      if (t instanceof KVariable && this.has(t.name)) {
+        return this._subst[t.name]!;
       }
       return t;
     };
@@ -669,7 +672,7 @@ export class Subst {
      * Replace occurrences of valuations from this Subst with the variables that they are assigned to.
      */
     let newTerm = term;
-    for (const [varName, value] of this._subst.entries()) {
+    for (const [varName, value] of this.entries()) {
       const lhs = value;
       const rhs = new KVariable(varName);
       const rewrite = new KRewrite(lhs, rhs);
@@ -729,13 +732,13 @@ export class Subst {
     const result: Record<string, KInner> = {};
 
     // First add all mappings from other, applying this substitution to their values
-    for (const [k, v] of other._subst.entries()) {
+    for (const [k, v] of other.entries()) {
       result[k] = this.apply(v);
     }
 
     // Then add mappings from this that are not in other
-    for (const [k, v] of this._subst.entries()) {
-      if (!other._subst.has(k)) {
+    for (const [k, v] of this.entries()) {
+      if (!other.has(k)) {
         result[k] = v;
       }
     }
@@ -749,7 +752,7 @@ export class Subst {
      */
     const result: Record<string, KInner> = {};
 
-    for (const [k, v] of this._subst.entries()) {
+    for (const [k, v] of this.entries()) {
       if (!(v instanceof KVariable && v.name === k)) {
         result[k] = v;
       }
@@ -840,15 +843,15 @@ export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {
   }
 }
 
-export function varOccurrences(term: KInner): Map<string, KVariable[]> {
-  const occurrences = new Map<string, KVariable[]>();
+export function varOccurrences(term: KInner): Record<string, KVariable[]> {
+  const occurrences: Record<string, KVariable[]> = {};
 
   const collectVar = (t: KInner): void => {
     if (t instanceof KVariable) {
-      if (!occurrences.has(t.name)) {
-        occurrences.set(t.name, []);
+      if (!(t.name in occurrences)) {
+        occurrences[t.name] = [];
       }
-      occurrences.get(t.name)!.push(t);
+      occurrences[t.name]!.push(t);
     }
   };
 
@@ -857,11 +860,11 @@ export function varOccurrences(term: KInner): Map<string, KVariable[]> {
 }
 
 export function keepVarsSorted(
-  occurrences: Map<string, KVariable[]>
-): Map<string, KVariable> {
-  const result = new Map<string, KVariable>();
+  occurrences: Record<string, KVariable[]>
+): Record<string, KVariable> {
+  const result: Record<string, KVariable> = {};
 
-  for (const [name, variables] of occurrences.entries()) {
+  for (const [name, variables] of Object.entries(occurrences)) {
     let sort: KSort | null = null;
 
     for (const variable of variables) {
@@ -875,7 +878,7 @@ export function keepVarsSorted(
       }
     }
 
-    result.set(name, new KVariable(name, sort));
+    result[name] = new KVariable(name, sort);
   }
 
   return result;

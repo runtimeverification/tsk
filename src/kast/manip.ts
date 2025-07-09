@@ -415,7 +415,7 @@ export function extractSubst(term: KInner): [Subst, KInner] {
 export function countVars(term: KInner): Counter<string> {
   const counter = new Counter<string>();
   const occurrences = varOccurrences(term);
-  for (const [vname, vars] of occurrences.entries()) {
+  for (const [vname, vars] of Object.entries(occurrences)) {
     counter.set(vname, vars.length);
   }
   return counter;
@@ -987,7 +987,7 @@ export function buildClaim(
   const vSubst: Record<string, KVariable> = {};
   const vremapSubst: Record<string, KVariable> = {};
 
-  for (const [v, vars] of occurrences.entries()) {
+  for (const [v, vars] of Object.entries(occurrences)) {
     let newV = v;
     if (vars.length === 1) {
       newV = "_" + newV;
@@ -996,8 +996,8 @@ export function buildClaim(
       newV = "?" + newV;
     }
     if (newV !== v) {
-      vSubst[v] = new KVariable(newV, sortedVars.get(v)?.sort);
-      vremapSubst[newV] = sortedVars.get(v)!;
+      vSubst[v] = new KVariable(newV, sortedVars[v]?.sort);
+      vremapSubst[newV] = sortedVars[v]!;
     }
   }
 
@@ -1087,7 +1087,7 @@ export function buildRule(
   const vSubst: Record<string, KVariable> = {};
   const vremapSubst: Record<string, KVariable> = {};
 
-  for (const [v, vars] of occurrences.entries()) {
+  for (const [v, vars] of Object.entries(occurrences)) {
     let newV = v;
     if (vars.length === 1) {
       newV = "_" + newV;
@@ -1096,8 +1096,8 @@ export function buildRule(
       newV = "?" + newV;
     }
     if (newV !== v) {
-      vSubst[v] = new KVariable(newV, sortedVars.get(v)?.sort);
-      vremapSubst[newV] = sortedVars.get(v)!;
+      vSubst[v] = new KVariable(newV, sortedVars[v]?.sort);
+      vremapSubst[newV] = sortedVars[v]!;
     }
   }
 

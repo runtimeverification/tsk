@@ -22,10 +22,7 @@ const AST_TO_KAST_TEST_DATA: Array<[any, any]> = [
   [new Require("domains.md"), new KRequire("domains.md")],
   [new Module("MAIN"), new KFlatModule("MAIN")],
   [new Att([]), EMPTY_ATT],
-  [
-    new Att([["concrete", ""]]),
-    KAtt.fromDict(new Map([["att", new Map([["concrete", ""]])]])),
-  ],
+  [new Att([["concrete", ""]]), KAtt.fromDict({ att: { concrete: "" } })],
 ];
 
 describe("ast_to_kast", () => {

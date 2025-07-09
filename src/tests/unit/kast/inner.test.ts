@@ -75,12 +75,10 @@ describe("keep_vars_sorted", () => {
   KEEP_VARS_SORTED_DATA.forEach(([occurrences, expected], index) => {
     test(`test case ${index}`, () => {
       // When
-      const occurrencesMap = new Map(Object.entries(occurrences));
-      const actual = keepVarsSorted(occurrencesMap);
+      const actual = keepVarsSorted(occurrences);
 
       // Then
-      const actualObject = Object.fromEntries(actual.entries());
-      expect(actualObject).toEqual(expected);
+      expect(actual).toEqual(expected);
     });
   });
 });

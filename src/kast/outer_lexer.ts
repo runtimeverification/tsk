@@ -221,8 +221,8 @@ export function* outerLexer(text: Iterable<string>): Generator<Token> {
   while (true) {
     let lastToken: Token;
 
-    if (SIMPLE_STATES.has(state)) {
-      const func = SIMPLE_STATES.get(state)!;
+    if (state in SIMPLE_STATES) {
+      const func = SIMPLE_STATES[state]!;
       const [token, newLa] = func(la, it);
       yield token;
       lastToken = token;
@@ -697,15 +697,14 @@ function klabelLexer(la: string, it: LocationIterator): [Token, string] {
   return [new Token(text, tokenType, loc), la];
 }
 
-const SIMPLE_STATES = new Map<
-  State,
-  (la: string, it: LocationIterator) => [Token, string]
->([
-  [State.DEFAULT, defaultLexer],
-  [State.SYNTAX, syntaxLexer],
-  [State.MODNAME, modnameLexer],
-  [State.KLABEL, klabelLexer],
-]);
+const SIMPLE_STATES: Partial<
+  Record<State, (la: string, it: LocationIterator) => [Token, string]>
+> = {
+  [State.DEFAULT]: defaultLexer,
+  [State.SYNTAX]: syntaxLexer,
+  [State.MODNAME]: modnameLexer,
+  [State.KLABEL]: klabelLexer,
+};
 
 const BUBBLE_KEYWORDS = new Set([
   "syntax",

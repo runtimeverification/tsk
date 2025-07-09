@@ -35,7 +35,7 @@ import {
 } from "./outer";
 import { TRUE } from "./prelude/kbool";
 
-type SymbolTable = Map<string, (...args: string[]) => string>;
+type SymbolTable = Record<string, (...args: string[]) => string>;
 
 export class PrettyPrinter {
   public readonly definition: KDefinition;
@@ -211,11 +211,12 @@ export class PrettyPrinter {
       return cellStr.trimEnd();
     }
 
-    const unparser = this.symbolTable.has(label)
-      ? this.symbolTable.get(label)!
-      : this.appliedLabelStr(label);
+    const unparser =
+      label in this.symbolTable
+        ? this.symbolTable[label]
+        : this.appliedLabelStr(label);
 
-    return unparser(...unparsedArgs);
+    return unparser!(...unparsedArgs);
   }
 
   private printKAs(kas: KAs): string {
@@ -475,7 +476,7 @@ export function buildSymbolTable(
   extraModules: KFlatModule[] = [],
   opinionated: boolean = false
 ): SymbolTable {
-  const symbolTable = new Map<string, (...args: string[]) => string>();
+  const symbolTable: Record<string, (...args: string[]) => string> = {};
   const allModules = [...definition.allModules, ...extraModules];
 
   for (const module of allModules) {
@@ -485,19 +486,17 @@ export function buildSymbolTable(
       const label = prod.klabel.name;
       const unparser = unparserForProduction(prod);
 
-      symbolTable.set(label, unparser);
+      symbolTable[label] = unparser;
       if (prod.att.has(Atts.SYMBOL)) {
-        symbolTable.set(prod.att.get(Atts.SYMBOL)!, unparser);
+        symbolTable[prod.att.get(Atts.SYMBOL)!] = unparser;
       }
     }
   }
 
   if (opinionated) {
-    symbolTable.set("#And", (c1: string, c2: string) => `${c1}\n#And ${c2}`);
-    symbolTable.set(
-      "#Or",
-      (c1: string, c2: string) => `${c1}\n#Or\n${indent(c2, 4)}`
-    );
+    symbolTable["#And"] = (c1: string, c2: string) => `${c1}\n#And ${c2}`;
+    symbolTable["#Or"] = (c1: string, c2: string) =>
+      `${c1}\n#Or\n${indent(c2, 4)}`;
   }
 
   return symbolTable;

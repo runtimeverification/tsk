@@ -1,4 +1,4 @@
-import { hashStr, mapToObject } from "../utils";
+import { hashStr } from "../utils";
 
 export abstract class KAst {
   private _hash: string | null = null;
@@ -7,12 +7,11 @@ export abstract class KAst {
     return 3;
   }
 
-  public abstract toDict(): Map<string, any>;
+  public abstract toDict(): Record<string, any>;
 
   public toJson(): string {
-    const dictMap = this.toDict();
-    const obj = mapToObject(dictMap);
-    return JSON.stringify(obj);
+    const dictObj = this.toDict();
+    return JSON.stringify(dictObj);
   }
 
   public toString(): string {
@@ -35,14 +34,14 @@ export abstract class KAst {
   // This is a simplified version for basic comparison
   protected asShallowTuple(): any[] {
     // Get all enumerable properties in a consistent order
-    const propertyMap = new Map<string, any>();
+    const propertyDict: Record<string, any> = {};
     const keys = Object.keys(this).sort();
 
     for (const key of keys) {
-      propertyMap.set(key, (this as any)[key]);
+      propertyDict[key] = (this as any)[key];
     }
 
-    return Array.from(propertyMap.values());
+    return Object.values(propertyDict);
   }
 
   // Implement comparison operators for sorting
@@ -67,16 +66,16 @@ export abstract class KAst {
   }
 }
 
-export function kastTerm(dct: Map<string, any>): Map<string, any> {
-  if (dct.get("format") !== "KAST") {
-    throw new Error(`Invalid format: ${dct.get("format")}`);
+export function kastTerm(dct: Record<string, any>): Record<string, any> {
+  if (dct["format"] !== "KAST") {
+    throw new Error(`Invalid format: ${dct["format"]}`);
   }
 
-  if (dct.get("version") != KAst.version()) {
+  if (dct["version"] != KAst.version()) {
     throw new Error(
-      `Invalid version: ${dct.get("version")}, expected: ${KAst.version()}`
+      `Invalid version: ${dct["version"]}, expected: ${KAst.version()}`
     );
   }
 
-  return dct.get("term");
+  return dct["term"];
 }

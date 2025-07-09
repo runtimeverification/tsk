@@ -82,11 +82,9 @@ export class CTerm {
   /**
    * Deserialize a `CTerm` from its dictionary representation.
    */
-  public static fromDict(dct: Map<string, any>): CTerm {
-    const config = KInner.fromDict(dct.get("config"));
-    const constraints = dct
-      .get("constraints")
-      .map((c: any) => KInner.fromDict(c));
+  public static fromDict(dct: Record<string, any>): CTerm {
+    const config = KInner.fromDict(dct.config);
+    const constraints = dct.constraints.map((c: any) => KInner.fromDict(c));
     return new CTerm(config, constraints);
   }
 
@@ -145,14 +143,11 @@ export class CTerm {
   /**
    * Serialize a `CTerm` to dictionary representation.
    */
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("config", this.config.toDict());
-    result.set(
-      "constraints",
-      this.constraints.map((c) => c.toDict())
-    );
-    return result;
+  public toDict(): Record<string, any> {
+    return {
+      config: this.config.toDict(),
+      constraints: this.constraints.map((c) => c.toDict()),
+    };
   }
 
   /**
@@ -434,24 +429,19 @@ export class CSubst {
   /**
    * Serialize `CSubst` to dictionary representation.
    */
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("subst", this.subst.toDict());
-    result.set(
-      "constraints",
-      this.constraints.map((c) => c.toDict())
-    );
-    return result;
+  public toDict(): Record<string, any> {
+    return {
+      subst: this.subst.toDict(),
+      constraints: this.constraints.map((c) => c.toDict()),
+    };
   }
 
   /**
    * Deserialize `CSubst` from a dictionary representation.
    */
-  public static fromDict(dct: Map<string, any>): CSubst {
-    const subst = Subst.fromDict(dct.get("subst"));
-    const constraints = dct
-      .get("constraints")
-      .map((c: any) => KInner.fromDict(c));
+  public static fromDict(dct: Record<string, any>): CSubst {
+    const subst = Subst.fromDict(dct["subst"]);
+    const constraints = dct["constraints"].map((c: any) => KInner.fromDict(c));
     return new CSubst(subst, constraints);
   }
 

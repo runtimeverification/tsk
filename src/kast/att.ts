@@ -1,4 +1,5 @@
-import { FrozenDict } from "../utils";
+import type { FrozenRecord } from "../utils";
+import { createFrozenRecord, frozenRecord } from "../utils";
 import { Color } from "./color";
 import { KAst } from "./kast";
 
@@ -104,7 +105,7 @@ export class AnyType extends AttType<any> {
       for (const [k, v] of Object.entries(obj)) {
         result[k] = this.freeze(v);
       }
-      return new FrozenDict(result);
+      return frozenRecord(result);
     }
     return obj;
   }
@@ -113,9 +114,14 @@ export class AnyType extends AttType<any> {
     if (Array.isArray(value)) {
       return value.map((v) => this.unfreeze(v));
     }
-    if (value instanceof FrozenDict) {
+    if (
+      value &&
+      typeof value === "object" &&
+      Object.isFrozen(value) &&
+      !Array.isArray(value)
+    ) {
       const result: Record<string, any> = {};
-      for (const [k, v] of value.entries()) {
+      for (const [k, v] of Object.entries(value)) {
         result[k] = this.unfreeze(v);
       }
       return result;
@@ -459,9 +465,9 @@ export class Atts {
   public static readonly USER_LIST = new AttKey("userList", _ANY);
   public static readonly WRAP_ELEMENT = new AttKey("wrapElement", _ANY);
 
-  private static _keys: FrozenDict<string, AttKey> | null = null;
+  private static _keys: FrozenRecord<AttKey> | null = null;
 
-  public static keys(): FrozenDict<string, AttKey> {
+  public static keys(): FrozenRecord<AttKey> {
     if (Atts._keys === null) {
       const keyEntries: [string, AttKey][] = [];
 
@@ -472,59 +478,84 @@ export class Atts {
         }
       }
 
-      Atts._keys = new FrozenDict(keyEntries);
+      Atts._keys = createFrozenRecord(keyEntries);
     }
     return Atts._keys;
   }
 }
 
 export class KAtt extends KAst implements Map<AttKey, any> {
-  public readonly atts: FrozenDict<AttKey, any>;
+  public readonly atts: FrozenRecord<any>;
+  private readonly keyLookup: FrozenRecord<AttKey>;
 
   constructor(entries: Iterable<AttEntry> = []) {
     super();
-    const attEntries: [AttKey, any][] = [];
+    const attRecord: Record<string, any> = {};
+    const keyRecord: Record<string, AttKey> = {};
+
     for (const entry of entries) {
-      attEntries.push([entry.key, entry.value]);
+      const keyName = entry.key.name;
+      attRecord[keyName] = entry.value;
+      keyRecord[keyName] = entry.key;
     }
-    this.atts = new FrozenDict(attEntries);
+
+    this.atts = frozenRecord(attRecord);
+    this.keyLookup = frozenRecord(keyRecord);
   }
 
   [Symbol.toStringTag]: string;
 
   public get size(): number {
-    return this.atts.size;
+    return Object.keys(this.atts).length;
   }
 
   public get(key: AttKey): any {
-    return this.atts.get(key);
+    return this.atts[key.name];
   }
 
   public has(key: AttKey): boolean {
-    return this.atts.has(key);
+    return key.name in this.atts;
   }
 
   public keys(): MapIterator<AttKey> {
-    return this.atts.keys();
+    const keyNames = Object.keys(this.atts);
+    const attKeys = keyNames
+      .map((name) => this.keyLookup[name])
+      .filter((key) => key !== undefined) as AttKey[];
+    return attKeys[Symbol.iterator]() as MapIterator<AttKey>;
   }
 
   public values(): MapIterator<any> {
-    return this.atts.values();
+    return Object.values(this.atts)[Symbol.iterator]() as MapIterator<any>;
   }
 
   public entries(): MapIterator<[AttKey, any]> {
-    return this.atts.entries();
+    const entries: [AttKey, any][] = [];
+    for (const keyName of Object.keys(this.atts)) {
+      const key = this.keyLookup[keyName];
+      if (key) {
+        const value = this.atts[keyName];
+        entries.push([key, value]);
+      }
+    }
+    return entries[Symbol.iterator]() as MapIterator<[AttKey, any]>;
   }
 
   public forEach(
     callbackfn: (value: any, key: AttKey, map: Map<AttKey, any>) => void,
     thisArg?: any
   ): void {
-    this.atts.forEach(callbackfn, thisArg);
+    for (const keyName of Object.keys(this.atts)) {
+      const key = this.keyLookup[keyName];
+      if (key) {
+        const value = this.atts[keyName];
+        callbackfn.call(thisArg, value, key, this);
+      }
+    }
   }
 
   public [Symbol.iterator](): MapIterator<[AttKey, any]> {
-    return this.atts[Symbol.iterator]();
+    return this.entries();
   }
 
   public set(key: AttKey, value: any): this {
@@ -540,19 +571,19 @@ export class KAtt extends KAst implements Map<AttKey, any> {
   }
 
   public attEntries(): Generator<AttEntry> {
-    return (function* (atts) {
-      for (const [key, value] of atts.entries()) {
+    return (function* (self) {
+      for (const [key, value] of self.entries()) {
         yield new AttEntry(key, value);
       }
-    })(this.atts);
+    })(this);
   }
 
-  public static fromDict(d: Map<string, any>): KAtt {
+  public static fromDict(d: Record<string, any>): KAtt {
     const entries: AttEntry[] = [];
-    const attDict = d.get("att") || new Map();
+    const attDict = d["att"] || {};
 
-    for (const [k, v] of attDict.entries()) {
-      const key = Atts.keys().get(k) || new AttKey(k, _ANY);
+    for (const [k, v] of Object.entries(attDict)) {
+      const key = Atts.keys()[k] || new AttKey(k, _ANY);
       const value = key.type.fromDict(v);
       entries.push(new AttEntry(key, value));
     }
@@ -560,22 +591,27 @@ export class KAtt extends KAst implements Map<AttKey, any> {
     return new KAtt(entries);
   }
 
-  public toDict(): Map<string, any> {
-    const attMap = new Map<string, any>();
-    for (const [key, value] of this.atts.entries()) {
-      attMap.set(key.name, key.type.toDict(value));
+  public toDict(): Record<string, any> {
+    const attMap: Record<string, any> = {};
+    for (const keyName of Object.keys(this.atts)) {
+      const key = this.keyLookup[keyName];
+      if (key) {
+        const value = this.atts[keyName];
+        attMap[key.name] = key.type.toDict(value);
+      }
     }
-    const result = new Map<string, any>();
-    result.set("node", "KAtt");
-    result.set("att", attMap);
+    const result: Record<string, any> = {
+      node: "KAtt",
+      att: attMap,
+    };
     return result;
   }
 
-  public static parse(d: Map<string, string>): KAtt {
+  public static parse(d: Record<string, string>): KAtt {
     const entries: AttEntry[] = [];
 
-    for (const [k, v] of d.entries()) {
-      const key = Atts.keys().get(k) || new AttKey(k, _ANY);
+    for (const [k, v] of Object.entries(d)) {
+      const key = Atts.keys()[k] || new AttKey(k, _ANY);
       const value = key.type.parse(v);
       entries.push(new AttEntry(key, value));
     }
@@ -589,12 +625,16 @@ export class KAtt extends KAst implements Map<AttKey, any> {
     }
 
     const attStrs: string[] = [];
-    for (const [key, value] of this.atts.entries()) {
-      const valueStr = key.type.unparse(value);
-      if (valueStr === null) {
-        attStrs.push(key.name);
-      } else {
-        attStrs.push(`${key.name}(${valueStr})`);
+    for (const keyName of Object.keys(this.atts)) {
+      const key = this.keyLookup[keyName];
+      const value = this.atts[keyName];
+      if (key) {
+        const valueStr = key.type.unparse(value);
+        if (valueStr === null) {
+          attStrs.push(key.name);
+        } else {
+          attStrs.push(`${key.name}(${valueStr})`);
+        }
       }
     }
 

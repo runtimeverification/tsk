@@ -37,24 +37,24 @@ const NORMAL = 1;
 const ESCAPE = 2;
 const CPOINT = 3;
 
-const ESCAPE_TABLE = new Map<string, string>([
-  ['"', '"'],
-  ["\\", "\\"],
-  ["n", "\n"],
-  ["t", "\t"],
-  ["r", "\r"],
-  ["f", "\f"],
-]);
+const ESCAPE_TABLE: Record<string, string> = {
+  '"': '"',
+  "\\": "\\",
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  f: "\f",
+};
 
-const CPOINT_TABLE = new Map<string, number>([
-  ["x", 2],
-  ["u", 4],
-  ["U", 8],
-]);
+const CPOINT_TABLE: Record<string, number> = {
+  x: 2,
+  u: 4,
+  U: 8,
+};
 
-const HEX_TABLE = new Map<string, number>();
+const HEX_TABLE: Record<string, number> = {};
 for (const c of "0123456789abcdefABCDEF") {
-  HEX_TABLE.set(c, parseInt(c, 16));
+  HEX_TABLE[c] = parseInt(c, 16);
 }
 
 export function* deQuoted(
@@ -68,12 +68,12 @@ export function* deQuoted(
 
   for (const c of it) {
     if (state === CPOINT) {
-      if (!HEX_TABLE.has(c)) {
+      if (!(c in HEX_TABLE)) {
         throw new Error(`Expected hex digit, got: ${c}`);
       }
 
       acc *= 16;
-      acc += HEX_TABLE.get(c)!;
+      acc += HEX_TABLE[c]!;
       cnt -= 1;
       if (cnt === 0) {
         yield String.fromCharCode(acc);
@@ -81,14 +81,14 @@ export function* deQuoted(
         state = NORMAL;
       }
     } else if (state === ESCAPE) {
-      if (CPOINT_TABLE.has(c)) {
+      if (c in CPOINT_TABLE) {
         if (!allowUnicode && c !== "x") {
           throw new Error(`Unicode escape sequence not allowed: \\${c}`);
         }
-        cnt = CPOINT_TABLE.get(c)!;
+        cnt = CPOINT_TABLE[c]!;
         state = CPOINT;
-      } else if (ESCAPE_TABLE.has(c)) {
-        yield ESCAPE_TABLE.get(c)!;
+      } else if (c in ESCAPE_TABLE) {
+        yield ESCAPE_TABLE[c]!;
         state = NORMAL;
       } else {
         throw new Error(`Unexpected escape sequence: \\${c}`);
@@ -107,14 +107,14 @@ export function* deQuoted(
   }
 }
 
-const ENQUOTE_TABLE = new Map<number, string>([
-  [9, "\\t"], // '\t'
-  [10, "\\n"], // '\n'
-  [12, "\\f"], // '\f'
-  [13, "\\r"], // '\r'
-  [34, '\\"'], // '"'
-  [92, "\\\\"], // '\\'
-]);
+const ENQUOTE_TABLE: Record<number, string> = {
+  9: "\\t", // '\t'
+  10: "\\n", // '\n'
+  12: "\\f", // '\f'
+  13: "\\r", // '\r'
+  34: '\\"', // '"'
+  92: "\\\\", // '\\'
+};
 
 export function* enQuoted(
   it: Iterable<string>,
@@ -124,8 +124,8 @@ export function* enQuoted(
 
   for (const c of it) {
     const code = c.charCodeAt(0);
-    if (ENQUOTE_TABLE.has(code)) {
-      yield ENQUOTE_TABLE.get(code)!;
+    if (code in ENQUOTE_TABLE) {
+      yield ENQUOTE_TABLE[code]!;
     } else if (32 <= code && code < 127) {
       yield c;
     } else if (code <= 0xff) {

@@ -29,25 +29,22 @@ describe("KVariable", () => {
     {
       testId: "no-sort",
       variable: new KVariable("Foo"),
-      dict: new Map([
-        ["node", "KVariable"],
-        ["name", "Foo"],
-      ]),
+      dict: {
+        node: "KVariable",
+        name: "Foo",
+      },
     },
     {
       testId: "sort",
       variable: new KVariable("Foo", new KSort("Int")),
-      dict: new Map<string, string | Map<string, string>>([
-        ["node", "KVariable"],
-        ["name", "Foo"],
-        [
-          "sort",
-          new Map([
-            ["node", "KSort"],
-            ["name", "Int"],
-          ]),
-        ],
-      ]),
+      dict: {
+        node: "KVariable",
+        name: "Foo",
+        sort: {
+          node: "KSort",
+          name: "Int",
+        },
+      },
     },
   ];
 

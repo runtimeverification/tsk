@@ -94,8 +94,8 @@ function attToKAtt(att: Att): KAtt {
     return EMPTY_ATT;
   }
 
-  const attMap = new Map(att.items);
-  return KAtt.parse(attMap);
+  const attObj = Object.fromEntries(att.items);
+  return KAtt.parse(attObj);
 }
 
 function sentenceToKSentence(s: Sentence): KSentence {

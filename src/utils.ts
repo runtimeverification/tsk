@@ -6,108 +6,27 @@ import * as path from "path";
 // Generic type variables
 export type Hashable = any; // string | number | boolean;
 
-// FrozenDict implementation
-export class FrozenDict<K extends Hashable, V> implements Map<K, V> {
-  private readonly _dict: Map<K, V>;
-  private _hash: number | null = null;
+// Enhanced Record with Object.freeze() for simple cases
+export type FrozenRecord<T = any> = Readonly<Record<string, T>>;
 
-  constructor(entries?: Iterable<[K, V]> | Record<string, V>) {
-    if (entries) {
-      if (Symbol.iterator in Object(entries)) {
-        this._dict = new Map(entries as Iterable<[K, V]>);
-      } else {
-        this._dict = new Map(
-          Object.entries(entries as Record<string, V>) as [K, V][]
-        );
-      }
-    } else {
-      this._dict = new Map();
-    }
-  }
-
-  get size(): number {
-    return this._dict.size;
-  }
-
-  get(key: K): V | undefined {
-    return this._dict.get(key);
-  }
-
-  has(key: K): boolean {
-    return this._dict.has(key);
-  }
-
-  keys(): MapIterator<K> {
-    return this._dict.keys();
-  }
-
-  values(): MapIterator<V> {
-    return this._dict.values();
-  }
-
-  entries(): MapIterator<[K, V]> {
-    return this._dict.entries();
-  }
-
-  forEach(
-    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
-    thisArg?: any
-  ): void {
-    this._dict.forEach(callbackfn, thisArg);
-  }
-
-  [Symbol.iterator](): MapIterator<[K, V]> {
-    return this._dict[Symbol.iterator]();
-  }
-
-  get [Symbol.toStringTag](): string {
-    return "FrozenDict";
-  }
-
-  // Additional methods for compatibility
-  set(key: K, value: V): this {
-    throw new Error("FrozenDict is immutable");
-  }
-
-  delete(key: K): boolean {
-    throw new Error("FrozenDict is immutable");
-  }
-
-  clear(): void {
-    throw new Error("FrozenDict is immutable");
-  }
-
-  hashCode(): number {
-    if (this._hash === null) {
-      let h = 0;
-      for (const [key, value] of this.entries()) {
-        h ^= this.hashPair(key, value);
-      }
-      this._hash = h;
-    }
-    return this._hash;
-  }
-
-  private hashPair(key: K, value: V): number {
-    // Simple hash function for demonstration
-    const keyStr = typeof key === "string" ? key : String(key);
-    const valueStr = typeof value === "string" ? value : String(value);
-    const combined = keyStr + ":" + valueStr;
-    let hash = 0;
-    for (let i = 0; i < combined.length; i++) {
-      const char = combined.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return hash;
-  }
-
-  toString(): string {
-    return `FrozenDict(${JSON.stringify(Object.fromEntries(this._dict))})`;
-  }
+export function frozenRecord<T>(obj: Record<string, T>): FrozenRecord<T> {
+  return Object.freeze({ ...obj });
 }
 
-export const EMPTY_FROZEN_DICT = new FrozenDict<any, any>();
+export function createFrozenRecord<T>(
+  entries: Iterable<[string, T]>
+): FrozenRecord<T> {
+  const obj: Record<string, T> = {};
+  for (const [key, value] of entries) {
+    obj[key] = value;
+  }
+  return Object.freeze(obj);
+}
+
+// Utility to check if an object is frozen
+export function isFrozenRecord(obj: any): obj is FrozenRecord {
+  return typeof obj === "object" && obj !== null && Object.isFrozen(obj);
+}
 
 // Utility functions
 export function checkType<T>(x: any, typ: new (...args: any[]) => T): T {
@@ -129,43 +48,19 @@ export function raised(
   }
 }
 
-export function mergeWith<K, V>(
+export function mergeWith<V>(
   f: (v1: V, v2: V) => V,
-  d1: Map<K, V> | Record<string, V>,
-  d2: Map<K, V> | Record<string, V>
-): Map<K, V> {
-  const result = new Map<K, V>();
+  d1: Record<string, V>,
+  d2: Record<string, V>
+): Record<string, V> {
+  const result: Record<string, V> = { ...d1 };
 
-  // Add all from d1
-  if (d1 instanceof Map) {
-    for (const [k, v] of d1.entries()) {
-      result.set(k, v);
-    }
-  } else {
-    for (const [k, v] of Object.entries(d1)) {
-      result.set(k as K, v as V);
-    }
-  }
-
-  // Merge from d2
-  if (d2 instanceof Map) {
-    for (const [k, v2] of d2.entries()) {
-      const v1 = result.get(k);
-      if (v1 !== undefined) {
-        result.set(k, f(v1, v2));
-      } else {
-        result.set(k, v2);
-      }
-    }
-  } else {
-    for (const [k, v2] of Object.entries(d2)) {
-      const key = k as K;
-      const v1 = result.get(key);
-      if (v1 !== undefined) {
-        result.set(key, f(v1, v2 as V));
-      } else {
-        result.set(key, v2 as V);
-      }
+  for (const [k, v2] of Object.entries(d2)) {
+    const v1 = result[k];
+    if (v1 !== undefined) {
+      result[k] = f(v1, v2);
+    } else {
+      result[k] = v2;
     }
   }
 
@@ -179,22 +74,14 @@ export function notNone<T>(x: T | null | undefined): T {
   return x;
 }
 
-export function filterNone<K, V>(
-  mapping: Map<K, V | null | undefined> | Record<string, V | null | undefined>
-): Map<K, V> {
-  const result = new Map<K, V>();
+export function filterNone<V>(
+  mapping: Record<string, V | null | undefined>
+): Record<string, V> {
+  const result: Record<string, V> = {};
 
-  if (mapping instanceof Map) {
-    for (const [k, v] of mapping.entries()) {
-      if (v !== null && v !== undefined) {
-        result.set(k, v);
-      }
-    }
-  } else {
-    for (const [k, v] of Object.entries(mapping)) {
-      if (v !== null && v !== undefined) {
-        result.set(k as K, v as V);
-      }
+  for (const [k, v] of Object.entries(mapping)) {
+    if (v !== null && v !== undefined) {
+      result[k] = v;
     }
   }
 
@@ -495,48 +382,6 @@ export function absOrRelTo(targetPath: string, basePath: string): string {
     return targetPath;
   }
   return path.join(basePath, targetPath);
-}
-
-// POSet implementation
-export class POSet<H extends Hashable> {
-  public readonly image: FrozenDict<H, Set<H>>;
-
-  constructor(relation: Iterable<[H, H]>) {
-    const imageMap = this.computeImage(relation);
-    const frozenImage = new Map<H, Set<H>>();
-    for (const [x, y] of imageMap.entries()) {
-      frozenImage.set(x, new Set(y));
-    }
-    this.image = new FrozenDict(frozenImage);
-  }
-
-  private computeImage(relation: Iterable<[H, H]>): Map<H, Set<H>> {
-    const image = new Map<H, Set<H>>();
-
-    for (const [x, y] of relation) {
-      if (!image.has(x)) {
-        image.set(x, new Set());
-      }
-      image.get(x)!.add(y);
-    }
-
-    const domain = new Set(image.keys());
-    for (const k of domain) {
-      for (const i of domain) {
-        if (!image.get(i)?.has(k)) {
-          continue;
-        }
-        const kSet = image.get(k);
-        if (kSet) {
-          for (const j of kSet) {
-            image.get(i)!.add(j);
-          }
-        }
-      }
-    }
-
-    return image;
-  }
 }
 
 // Process execution utilities
@@ -945,52 +790,27 @@ export function none(_: any): void {
 }
 
 /**
- * Recursively convert a plain JavaScript object to a Map structure
- * This is needed because JSON.parse() returns plain objects but KDefinition.fromDict() expects Maps
+ * Recursively convert nested arrays and objects.
+ * @param obj Object to convert
+ * @returns Converted object
  */
-export function objectToMap(obj: any): any {
-  if (obj === null || obj === undefined) {
+export function deepConvert(obj: any): any {
+  // Handle non-object/array values (primitives, dates, etc.)
+  if (typeof obj !== "object" || obj === null) {
     return obj;
   }
 
-  if (Array.isArray(obj)) {
-    return obj.map(objectToMap);
-  }
-
-  if (typeof obj === "object" && obj.constructor === Object) {
-    const map = new Map<string, any>();
-    for (const [key, value] of Object.entries(obj)) {
-      map.set(key, objectToMap(value));
-    }
-    return map;
-  }
-
-  return obj;
-}
-
-/**
- * Map a Map or array to a plain JavaScript object.
- * @param map
- * @returns
- */
-export function mapToObject(map: any): any {
-  // Handle non-Map/array values (primitives, dates, etc.)
-  if (!(map instanceof Map) && !Array.isArray(map)) {
-    return map;
-  }
-
   // Convert arrays recursively
-  if (Array.isArray(map)) {
-    return map.map(mapToObject);
+  if (Array.isArray(obj)) {
+    return obj.map(deepConvert);
   }
 
-  // Convert Map entries to an object
-  const obj = {};
-  for (const [key, value] of map.entries()) {
-    // @ts-ignore
-    obj[key] = mapToObject(value); // Recurse for nested Maps/arrays
+  // Convert object properties recursively
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = deepConvert(value);
   }
-  return obj;
+  return result;
 }
 
 /**

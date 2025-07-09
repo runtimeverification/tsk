@@ -3,7 +3,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { KDefinition } from "../../../kast/outer";
 import { parseOuter } from "../../../kast/utils";
-import { objectToMap } from "../../../utils";
 
 const TEST_DATA_DIR = path.resolve(__dirname, "../test-data");
 const PARSE_OUTER_TEST_DIR = path.join(TEST_DATA_DIR, "parse-outer");
@@ -22,8 +21,7 @@ describe("parseOuter", () => {
       // Given
       const expectedFile = testFile + ".expected.json";
       const expectedJson = JSON.parse(fs.readFileSync(expectedFile, "utf8"));
-      const expectedMap = objectToMap(expectedJson);
-      const expected = KDefinition.fromDict(expectedMap);
+      const expected = KDefinition.fromDict(expectedJson);
       const mainModule = path.parse(testFile).name.toUpperCase();
 
       // When

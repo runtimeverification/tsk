@@ -5,7 +5,7 @@ export function indexedRewrite(
   rewrites: Iterable<KRewrite>
 ): KInner {
   const tokenRewrites: KRewrite[] = [];
-  const applyRewrites: Map<string, KRewrite[]> = new Map();
+  const applyRewrites: Record<string, KRewrite[]> = {};
   const otherRewrites: KRewrite[] = [];
 
   for (const r of rewrites) {
@@ -13,10 +13,10 @@ export function indexedRewrite(
       tokenRewrites.push(r);
     } else if (r.lhs instanceof KApply) {
       const labelName = r.lhs.label.name;
-      if (applyRewrites.has(labelName)) {
-        applyRewrites.get(labelName)!.push(r);
+      if (labelName in applyRewrites) {
+        applyRewrites[labelName]!.push(r);
       } else {
-        applyRewrites.set(labelName, [r]);
+        applyRewrites[labelName] = [r];
       }
     } else {
       otherRewrites.push(r);
@@ -32,8 +32,8 @@ export function indexedRewrite(
       }
     } else if (result instanceof KApply) {
       const labelName = result.label.name;
-      if (applyRewrites.has(labelName)) {
-        for (const ar of applyRewrites.get(labelName)!) {
+      if (labelName in applyRewrites) {
+        for (const ar of applyRewrites[labelName]!) {
           result = ar.applyTop(result);
         }
       }

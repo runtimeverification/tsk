@@ -1,5 +1,6 @@
 import * as fs from "fs";
-import { FrozenDict, notNone, single } from "../utils";
+import type { FrozenRecord } from "../utils";
+import { frozenRecord, notNone, single } from "../utils";
 import { Atts, EMPTY_ATT, Format, KAtt, type WithKAtt } from "./att";
 import {
   KApply,
@@ -40,8 +41,8 @@ export abstract class KProductionItem extends KOuter {
     "KNonTerminal",
   ]);
 
-  public static fromDict(d: Map<string, any>): KProductionItem {
-    const node = d.get("node");
+  public static fromDict(d: Record<string, any>): KProductionItem {
+    const node = d["node"];
     if (!KProductionItem.NODES.has(node)) {
       throw new Error(`Invalid KProductionItem node: ${node}`);
     }
@@ -70,14 +71,14 @@ export class KRegexTerminal extends KProductionItem {
     this.regex = regex;
   }
 
-  public static _fromDict(d: Map<string, any>): KRegexTerminal {
-    return new KRegexTerminal(d.get("regex"));
+  public static _fromDict(d: Record<string, any>): KRegexTerminal {
+    return new KRegexTerminal(d["regex"]);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KRegexTerminal");
-    result.set("regex", this.regex);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KRegexTerminal";
+    result["regex"] = this.regex;
     return result;
   }
 
@@ -100,17 +101,17 @@ export class KNonTerminal extends KProductionItem {
     this.name = name ?? null;
   }
 
-  public static _fromDict(d: Map<string, any>): KNonTerminal {
-    const name = d.has("name") ? d.get("name") : null;
-    return new KNonTerminal(KSort.fromDict(d.get("sort")), name);
+  public static _fromDict(d: Record<string, any>): KNonTerminal {
+    const name = d["name"] ? d["name"] : null;
+    return new KNonTerminal(KSort.fromDict(d["sort"]), name);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KNonTerminal");
-    result.set("sort", this.sort.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KNonTerminal";
+    result["sort"] = this.sort.toDict();
     if (this.name !== null) {
-      result.set("name", this.name);
+      result["name"] = this.name;
     }
     return result;
   }
@@ -135,14 +136,14 @@ export class KTerminal extends KProductionItem {
     this.value = value;
   }
 
-  public static _fromDict(d: Map<string, any>): KTerminal {
-    return new KTerminal(d.get("value"));
+  public static _fromDict(d: Record<string, any>): KTerminal {
+    return new KTerminal(d["value"]);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KTerminal");
-    result.set("value", this.value);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KTerminal";
+    result["value"] = this.value;
     return result;
   }
 
@@ -172,8 +173,8 @@ export abstract class KSentence extends KOuter implements WithKAtt {
   public abstract get att(): KAtt;
   public abstract letAtt(att: KAtt): KSentence;
 
-  public static fromDict(d: Map<string, any>): KSentence {
-    const node = d.get("node");
+  public static fromDict(d: Record<string, any>): KSentence {
+    const node = d["node"];
     if (!KSentence.NODES.has(node)) {
       throw new Error(`Invalid KSentence node: ${node}`);
     }
@@ -263,22 +264,22 @@ export class KProduction extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KProduction {
+  public static _fromDict(d: Record<string, any>): KProduction {
     return new KProduction(
-      KSort.fromDict(d.get("sort")),
-      d
-        .get("productionItems")
-        ?.map((item: any) => KProductionItem.fromDict(item)) || [],
-      d.get("params")?.map((param: any) => KSort.fromDict(param)) || [],
-      d.get("klabel") ? KLabel.fromDict(d.get("klabel")) : null,
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KSort.fromDict(d["sort"]),
+      d["productionItems"]?.map((item: any) =>
+        KProductionItem.fromDict(item)
+      ) || [],
+      d["params"]?.map((param: any) => KSort.fromDict(param)) || [],
+      d["klabel"] ? KLabel.fromDict(d["klabel"]) : null,
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KProduction");
-    result.set("sort", this.sort.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KProduction";
+    result["sort"] = this.sort.toDict();
     result.set(
       "productionItems",
       this.items.map((item) => item.toDict())
@@ -288,9 +289,9 @@ export class KProduction extends KSentence {
       this.params.map((param) => param.toDict())
     );
     if (this.klabel) {
-      result.set("klabel", this.klabel.toDict());
+      result["klabel"] = this.klabel.toDict();
     }
-    result.set("att", this.att.toDict());
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -422,23 +423,23 @@ export class KSyntaxSort extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KSyntaxSort {
+  public static _fromDict(d: Record<string, any>): KSyntaxSort {
     return new KSyntaxSort(
-      KSort.fromDict(d.get("sort")),
-      d.get("params")?.map((param: any) => KSort.fromDict(param)) || [],
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KSort.fromDict(d["sort"]),
+      d["params"]?.map((param: any) => KSort.fromDict(param)) || [],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSyntaxSort");
-    result.set("sort", this.sort.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KSyntaxSort";
+    result["sort"] = this.sort.toDict();
     result.set(
       "params",
       this.params.map((param) => param.toDict())
     );
-    result.set("att", this.att.toDict());
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -475,20 +476,20 @@ export class KSortSynonym extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KSortSynonym {
+  public static _fromDict(d: Record<string, any>): KSortSynonym {
     return new KSortSynonym(
-      KSort.fromDict(d.get("newSort")),
-      KSort.fromDict(d.get("oldSort")),
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KSort.fromDict(d["newSort"]),
+      KSort.fromDict(d["oldSort"]),
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSortSynonym");
-    result.set("newSort", this.newSort.toDict());
-    result.set("oldSort", this.oldSort.toDict());
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KSortSynonym";
+    result["newSort"] = this.newSort.toDict();
+    result["oldSort"] = this.oldSort.toDict();
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -525,20 +526,20 @@ export class KSyntaxLexical extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KSyntaxLexical {
+  public static _fromDict(d: Record<string, any>): KSyntaxLexical {
     return new KSyntaxLexical(
-      d.get("name"),
-      d.get("regex"),
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["name"],
+      d["regex"],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSyntaxLexical");
-    result.set("name", this.name);
-    result.set("regex", this.regex);
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KSyntaxLexical";
+    result["name"] = this.name;
+    result["regex"] = this.regex;
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -585,20 +586,20 @@ export class KSyntaxAssociativity extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KSyntaxAssociativity {
+  public static _fromDict(d: Record<string, any>): KSyntaxAssociativity {
     return new KSyntaxAssociativity(
-      d.get("assoc") as KAssoc,
-      d.get("tags"),
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["assoc"] as KAssoc,
+      d["tags"],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSyntaxAssociativity");
-    result.set("assoc", this.assoc);
-    result.set("tags", Array.from(this.tags));
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KSyntaxAssociativity";
+    result["assoc"] = this.assoc;
+    result["tags"] = Array.from(this.tags);
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -636,21 +637,21 @@ export class KSyntaxPriority extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KSyntaxPriority {
+  public static _fromDict(d: Record<string, any>): KSyntaxPriority {
     return new KSyntaxPriority(
-      d.get("priorities"),
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["priorities"],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KSyntaxPriority");
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KSyntaxPriority";
     result.set(
       "priorities",
       this.priorities.map((group) => Array.from(group))
     );
-    result.set("att", this.att.toDict());
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -686,20 +687,20 @@ export class KBubble extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KBubble {
+  public static _fromDict(d: Record<string, any>): KBubble {
     return new KBubble(
-      d.get("sentenceType"),
-      d.get("contents"),
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["sentenceType"],
+      d["contents"],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KBubble");
-    result.set("sentenceType", this.sentenceType);
-    result.set("contents", this.contents);
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KBubble";
+    result["sentenceType"] = this.sentenceType;
+    result["contents"] = this.contents;
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -763,22 +764,22 @@ export class KRule extends KRuleLike {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KRule {
+  public static _fromDict(d: Record<string, any>): KRule {
     return new KRule(
-      KInner.fromDict(d.get("body")),
-      d.get("requires") ? KInner.fromDict(d.get("requires")) : TRUE,
-      d.get("ensures") ? KInner.fromDict(d.get("ensures")) : TRUE,
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KInner.fromDict(d["body"]),
+      d["requires"] ? KInner.fromDict(d["requires"]) : TRUE,
+      d["ensures"] ? KInner.fromDict(d["ensures"]) : TRUE,
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KRule");
-    result.set("body", this.body.toDict());
-    result.set("requires", this.requires.toDict());
-    result.set("ensures", this.ensures.toDict());
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KRule";
+    result["body"] = this.body.toDict();
+    result["requires"] = this.requires.toDict();
+    result["ensures"] = this.ensures.toDict();
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -832,22 +833,22 @@ export class KClaim extends KRuleLike {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KClaim {
+  public static _fromDict(d: Record<string, any>): KClaim {
     return new KClaim(
-      KInner.fromDict(d.get("body")),
-      d.get("requires") ? KInner.fromDict(d.get("requires")) : TRUE,
-      d.get("ensures") ? KInner.fromDict(d.get("ensures")) : TRUE,
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KInner.fromDict(d["body"]),
+      d["requires"] ? KInner.fromDict(d["requires"]) : TRUE,
+      d["ensures"] ? KInner.fromDict(d["ensures"]) : TRUE,
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KClaim");
-    result.set("body", this.body.toDict());
-    result.set("requires", this.requires.toDict());
-    result.set("ensures", this.ensures.toDict());
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KClaim";
+    result["body"] = this.body.toDict();
+    result["requires"] = this.requires.toDict();
+    result["ensures"] = this.ensures.toDict();
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -902,20 +903,20 @@ export class KContext extends KSentence {
     this.att = att;
   }
 
-  public static _fromDict(d: Map<string, any>): KContext {
+  public static _fromDict(d: Record<string, any>): KContext {
     return new KContext(
-      KInner.fromDict(d.get("body")),
-      d.get("requires") ? KInner.fromDict(d.get("requires")) : TRUE,
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      KInner.fromDict(d["body"]),
+      d["requires"] ? KInner.fromDict(d["requires"]) : TRUE,
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KContext");
-    result.set("body", this.body.toDict());
-    result.set("requires", this.requires.toDict());
-    result.set("att", this.att.toDict());
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KContext";
+    result["body"] = this.body.toDict();
+    result["requires"] = this.requires.toDict();
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -951,15 +952,15 @@ export class KImport extends KOuter {
     this.public = isPublic;
   }
 
-  public static fromDict(d: Map<string, any>): KImport {
-    return new KImport(d.get("name"), d.get("isPublic"));
+  public static fromDict(d: Record<string, any>): KImport {
+    return new KImport(d["name"], d["isPublic"]);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KImport");
-    result.set("name", this.name);
-    result.set("isPublic", this.public);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KImport";
+    result["name"] = this.name;
+    result["isPublic"] = this.public;
     return result;
   }
 
@@ -1073,11 +1074,11 @@ export class KFlatModule
     ) as KClaim[];
   }
 
-  public get sentenceByUniqueId(): Map<string, KSentence> {
-    const result = new Map<string, KSentence>();
+  public get sentenceByUniqueId(): Record<string, KSentence> {
+    const result: Record<string, KSentence> = {};
     for (const sent of this.sentences) {
       if (sent.uniqueId !== null) {
-        result.set(sent.uniqueId, sent);
+        result[sent.uniqueId] = sent;
       }
     }
     return result;
@@ -1097,19 +1098,19 @@ export class KFlatModule
     });
   }
 
-  public static fromDict(d: Map<string, any>): KFlatModule {
+  public static fromDict(d: Record<string, any>): KFlatModule {
     return new KFlatModule(
-      d.get("name"),
-      d.get("localSentences")?.map((s: any) => KSentence.fromDict(s)) || [],
-      d.get("imports")?.map((i: any) => KImport.fromDict(i)) || [],
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["name"],
+      d["localSentences"]?.map((s: any) => KSentence.fromDict(s)) || [],
+      d["imports"]?.map((i: any) => KImport.fromDict(i)) || [],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KFlatModule");
-    result.set("name", this.name);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KFlatModule";
+    result["name"] = this.name;
     result.set(
       "localSentences",
       this.sentences.map((s) => s.toDict())
@@ -1118,7 +1119,7 @@ export class KFlatModule
       "imports",
       this.imports.map((i) => i.toDict())
     );
-    result.set("att", this.att.toDict());
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -1157,17 +1158,17 @@ export class KFlatModuleList extends KOuter {
     this.modules = Array.from(modules);
   }
 
-  public static fromDict(d: Map<string, any>): KFlatModuleList {
+  public static fromDict(d: Record<string, any>): KFlatModuleList {
     return new KFlatModuleList(
-      d.get("mainModule"),
-      d.get("term")?.map((kfm: any) => KFlatModule.fromDict(kfm)) || []
+      d["mainModule"],
+      d["term"]?.map((kfm: any) => KFlatModule.fromDict(kfm)) || []
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KFlatModuleList");
-    result.set("mainModule", this.mainModule);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KFlatModuleList";
+    result["mainModule"] = this.mainModule;
     result.set(
       "term",
       this.modules.map((mod) => mod.toDict())
@@ -1200,14 +1201,14 @@ export class KRequire extends KOuter {
     this.require = requirePath;
   }
 
-  public static fromDict(d: Map<string, any>): KRequire {
-    return new KRequire(d.get("require"));
+  public static fromDict(d: Record<string, any>): KRequire {
+    return new KRequire(d["require"]);
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KRequire");
-    result.set("require", this.require);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KRequire";
+    result["require"] = this.require;
     return result;
   }
 
@@ -1232,8 +1233,8 @@ export class KDefinition
   public readonly att: KAtt;
   public readonly mainModule: KFlatModule;
 
-  private _initConfig: Map<KSort, KInner> = new Map();
-  private _emptyConfig: Map<KSort, KInner> = new Map();
+  private _initConfig: Record<string, KInner> = {};
+  private _emptyConfig: Record<string, KInner> = {};
 
   constructor(
     mainModuleName: string,
@@ -1262,27 +1263,27 @@ export class KDefinition
     this.requires = Array.from(requires);
     this.att = att;
     this.mainModule = mainModule;
-    this._initConfig = new Map();
-    this._emptyConfig = new Map();
+    this._initConfig = {};
+    this._emptyConfig = {};
   }
 
   public [Symbol.iterator](): Iterator<KFlatModule> {
     return this.allModules[Symbol.iterator]();
   }
 
-  public static fromDict(d: Map<string, any>): KDefinition {
+  public static fromDict(d: Record<string, any>): KDefinition {
     return new KDefinition(
-      d.get("mainModule"),
-      d.get("modules")?.map((m: any) => KFlatModule.fromDict(m)) || [],
-      d.get("requires")?.map((r: any) => KRequire.fromDict(r)) || [],
-      d.get("att") ? KAtt.fromDict(d.get("att")) : EMPTY_ATT
+      d["mainModule"],
+      d["modules"]?.map((m: any) => KFlatModule.fromDict(m)) || [],
+      d["requires"]?.map((r: any) => KRequire.fromDict(r)) || [],
+      d["att"] ? KAtt.fromDict(d["att"]) : EMPTY_ATT
     );
   }
 
-  public toDict(): Map<string, any> {
-    const result = new Map<string, any>();
-    result.set("node", "KDefinition");
-    result.set("mainModule", this.mainModuleName);
+  public toDict(): Record<string, any> {
+    const result: Record<string, any> = {};
+    result["node"] = "KDefinition";
+    result["mainModule"] = this.mainModuleName;
     result.set(
       "modules",
       this.allModules.map((m) => m.toDict())
@@ -1291,7 +1292,7 @@ export class KDefinition
       "requires",
       this.requires.map((r) => r.toDict())
     );
-    result.set("att", this.att.toDict());
+    result["att"] = this.att.toDict();
     return result;
   }
 
@@ -1331,23 +1332,23 @@ export class KDefinition
       if (!seenModules.includes(mname)) {
         seenModules.push(mname);
         moduleNames.push(
-          ...this.allModulesDict.get(mname)!.imports.map((i) => i.name)
+          ...this.allModulesDict[mname]!.imports.map((i) => i.name)
         );
       }
     }
     return seenModules;
   }
 
-  public get allModulesDict(): Map<string, KFlatModule> {
-    const result = new Map<string, KFlatModule>();
+  public get allModulesDict(): Record<string, KFlatModule> {
+    const result: Record<string, KFlatModule> = {};
     for (const m of this.allModules) {
-      result.set(m.name, m);
+      result[m.name] = m;
     }
     return result;
   }
 
   public get modules(): KFlatModule[] {
-    return this.moduleNames.map((mname) => this.allModulesDict.get(mname)!);
+    return this.moduleNames.map((mname) => this.allModulesDict[mname]!);
   }
 
   public get productions(): KProduction[] {
@@ -1402,19 +1403,21 @@ export class KDefinition
     return this.rules.filter(isSemantic);
   }
 
-  public get sentenceByUniqueId(): Map<string, KSentence> {
-    const uniqueIdMap = new Map<string, KSentence>();
+  public get sentenceByUniqueId(): Record<string, KSentence> {
+    const uniqueIdMap: Record<string, KSentence> = {};
     for (const module of this.allModules) {
-      for (const [uniqueId, sent] of module.sentenceByUniqueId.entries()) {
-        if (uniqueIdMap.has(uniqueId) && sent !== uniqueIdMap.get(uniqueId)) {
+      for (const [uniqueId, sent] of Object.entries(
+        module.sentenceByUniqueId
+      )) {
+        if (uniqueId in uniqueIdMap && sent !== uniqueIdMap[uniqueId]) {
           console.debug(
             `Same UNIQUE_ID found for two different sentences: ${[
               sent,
-              uniqueIdMap.get(uniqueId),
+              uniqueIdMap[uniqueId],
             ]}`
           );
         } else {
-          uniqueIdMap.set(uniqueId, sent);
+          uniqueIdMap[uniqueId] = sent;
         }
       }
     }
@@ -1441,10 +1444,10 @@ export class KDefinition
   }
 
   public module(name: string): KFlatModule {
-    return this.allModulesDict.get(name)!;
+    return this.allModulesDict[name]!;
   }
 
-  public get overloads(): FrozenDict<string, Set<string>> {
+  public get overloads(): FrozenRecord<Set<string>> {
     /**
      * Return a mapping from symbols to the sets of symbols that overload them.
      */
@@ -1480,47 +1483,43 @@ export class KDefinition
       return less;
     };
 
-    const symbolsByOverload = new Map<string, string[]>();
-    for (const symbol of this.symbols.keys()) {
-      const prod = this.symbols.get(symbol)!;
+    const symbolsByOverload: Record<string, string[]> = {};
+    for (const symbol of Object.keys(this.symbols)) {
+      const prod = this.symbols[symbol]!;
       if (prod.att.has(Atts.OVERLOAD)) {
         const overloadKey = prod.att.get(Atts.OVERLOAD)!;
-        if (!symbolsByOverload.has(overloadKey)) {
-          symbolsByOverload.set(overloadKey, []);
+        if (!(overloadKey in symbolsByOverload)) {
+          symbolsByOverload[overloadKey] = [];
         }
-        symbolsByOverload.get(overloadKey)!.push(symbol);
+        symbolsByOverload[overloadKey]!.push(symbol);
       }
     }
 
-    const overloads = new Map<string, string[]>();
-    for (const [_, symbols] of symbolsByOverload.entries()) {
+    const overloads: Record<string, string[]> = {};
+    for (const [_, symbols] of Object.entries(symbolsByOverload)) {
       for (const overloader of symbols) {
         for (const overloaded of symbols) {
           if (overloader === overloaded) continue;
           if (
-            lt.call(
-              this,
-              this.symbols.get(overloader)!,
-              this.symbols.get(overloaded)!
-            )
+            lt.call(this, this.symbols[overloader]!, this.symbols[overloaded]!)
           ) {
-            if (!overloads.has(overloaded)) {
-              overloads.set(overloaded, []);
+            if (!(overloaded in overloads)) {
+              overloads[overloaded] = [];
             }
-            overloads.get(overloaded)!.push(overloader);
+            overloads[overloaded]!.push(overloader);
           }
         }
       }
     }
 
-    const result = new Map<string, Set<string>>();
-    for (const [key, values] of overloads.entries()) {
-      result.set(key, new Set(values));
+    const result: Record<string, Set<string>> = {};
+    for (const [key, values] of Object.entries(overloads)) {
+      result[key] = new Set(values);
     }
-    return new FrozenDict(result);
+    return frozenRecord(result);
   }
 
-  public get priorities(): FrozenDict<string, Set<string>> {
+  public get priorities(): FrozenRecord<Set<string>> {
     /**
      * Return a mapping from symbols to the sets of symbols with lower priority.
      */
@@ -1542,25 +1541,27 @@ export class KDefinition
     }
 
     // Simple implementation of transitive closure
-    const result = new Map<string, Set<string>>();
+    const result: Record<string, Set<string>> = {};
     for (const [higher, lower] of relation) {
-      if (!result.has(higher)) {
-        result.set(higher, new Set());
+      if (!result[higher]) {
+        result[higher] = new Set();
       }
-      result.get(higher)!.add(lower);
+      result[higher].add(lower);
     }
-    return new FrozenDict(result);
+    return frozenRecord(result);
   }
 
-  public get leftAssocs(): FrozenDict<string, Set<string>> {
-    return new FrozenDict(this.assocs(KAssoc.LEFT));
+  public get leftAssocs(): FrozenRecord<Set<string>> {
+    const map = this.assocs(KAssoc.LEFT);
+    return frozenRecord(map);
   }
 
-  public get rightAssocs(): FrozenDict<string, Set<string>> {
-    return new FrozenDict(this.assocs(KAssoc.RIGHT));
+  public get rightAssocs(): FrozenRecord<Set<string>> {
+    const map = this.assocs(KAssoc.RIGHT);
+    return frozenRecord(map);
   }
 
-  private assocs(assoc: KAssoc): Map<string, Set<string>> {
+  private assocs(assoc: KAssoc): Record<string, Set<string>> {
     const sents = this.modules
       .flatMap((module) => module.sentences)
       .filter(
@@ -1569,65 +1570,65 @@ export class KDefinition
           (sent.assoc === assoc || sent.assoc === KAssoc.NON_ASSOC)
       ) as KSyntaxAssociativity[];
 
-    const result = new Map<string, Set<string>>();
+    const result: Record<string, Set<string>> = {};
     for (const sent of sents) {
       for (const tag1 of sent.tags) {
         for (const tag2 of sent.tags) {
-          if (!result.has(tag1)) {
-            result.set(tag1, new Set());
+          if (!(tag1 in result)) {
+            result[tag1] = new Set();
           }
-          result.get(tag1)!.add(tag2);
+          result[tag1]!.add(tag2);
         }
       }
     }
     return result;
   }
 
-  public get subsortTable(): FrozenDict<KSort, Set<KSort>> {
-    const subsorts = new Map<KSort, Set<KSort>>();
+  public get subsortTable(): FrozenRecord<Set<KSort>> {
+    const subsorts: Record<string, Set<KSort>> = {};
     for (const prod of this.productions) {
       const subsort = prod.asSubsort;
       if (subsort) {
         const [supersort, sub] = subsort;
-        if (!subsorts.has(supersort)) {
-          subsorts.set(supersort, new Set());
+        if (!subsorts[supersort.name]) {
+          subsorts[supersort.name] = new Set();
         }
-        subsorts.get(supersort)!.add(sub);
+        subsorts[supersort.name]!.add(sub);
       }
     }
-    return new FrozenDict(subsorts);
+    return frozenRecord(subsorts);
   }
 
   public subsorts(sort: KSort): Set<KSort> {
-    return this.subsortTable.get(sort) || new Set();
+    return this.subsortTable[sort.name] || new Set();
   }
 
-  public get brackets(): FrozenDict<KSort, KProduction> {
-    const brackets = new Map<KSort, KProduction>();
+  public get brackets(): FrozenRecord<KProduction> {
+    const brackets: Record<string, KProduction> = {};
     for (const prod of this.productions) {
       if (prod.att.has(Atts.BRACKET)) {
         if (prod.klabel) {
           throw new Error("Bracket production should not have klabel");
         }
         const sort = prod.sort;
-        if (brackets.has(sort)) {
+        if (sort.name in brackets) {
           throw new Error(
             `Multiple bracket productions for sort: ${sort.name}`
           );
         }
-        brackets.set(sort, prod);
+        brackets[sort.name] = prod;
       }
     }
-    return new FrozenDict(brackets);
+    return frozenRecord(brackets);
   }
 
-  public get symbols(): FrozenDict<string, KProduction> {
-    const symbols = new Map<string, KProduction>();
+  public get symbols(): FrozenRecord<KProduction> {
+    const symbols: Record<string, KProduction> = {};
     for (const prod of this.productions) {
       if (!prod.klabel) continue;
       const symbol = prod.klabel.name;
-      if (symbols.has(symbol)) {
-        const other = symbols.get(symbol)!;
+      if (symbol in symbols) {
+        const other = symbols[symbol]!;
         // Check if they're the same production (ignoring source attributes)
         const thisNoSource = prod.let({
           att: prod.att.dropSource?.() || prod.att,
@@ -1645,25 +1646,25 @@ export class KDefinition
         }
         continue;
       }
-      symbols.set(symbol, prod);
+      symbols[symbol] = prod;
     }
-    return new FrozenDict(symbols);
+    return frozenRecord(symbols);
   }
 
-  public get syntaxSymbols(): FrozenDict<string, KProduction> {
-    const brackets = new Map<string, KProduction>();
-    for (const [_, prod] of this.brackets.entries()) {
+  public get syntaxSymbols(): FrozenRecord<KProduction> {
+    const brackets: Record<string, KProduction> = {};
+    for (const [_, prod] of Object.entries(this.brackets)) {
       const bracketLabel = prod.att.get(Atts.BRACKET_LABEL);
       if (bracketLabel) {
-        brackets.set(bracketLabel, prod);
+        brackets[bracketLabel] = prod;
       }
     }
 
-    const combined = new Map([
-      ...this.symbols.entries(),
-      ...brackets.entries(),
-    ]);
-    return new FrozenDict(combined);
+    const combined: Record<string, KProduction> = {
+      ...this.symbols,
+      ...brackets,
+    };
+    return frozenRecord(combined);
   }
 
   public sort(kast: KInner): KSort | null {
@@ -1708,14 +1709,14 @@ export class KDefinition
     /**
      * Compute the result and argument sorts for a given production based on a KLabel.
      */
-    const prod = this.symbols.get(label.name)!;
-    const sorts = new Map<KSort, KSort>();
+    const prod = this.symbols[label.name]!;
+    const sorts: Record<string, KSort> = {};
     for (let i = 0; i < prod.params.length; i++) {
-      sorts.set(prod.params[i]!, label.params[i]!);
+      sorts[prod.params[i]!.name] = label.params[i]!;
     }
 
     function resolve(sort: KSort): KSort {
-      return sorts.get(sort) || sort;
+      return sorts[sort.name] || sort;
     }
 
     return [resolve(prod.sort), prod.argumentSorts.map(resolve)];
@@ -1751,7 +1752,7 @@ export class KDefinition
     const addKSequenceUnderKProductionsInner = (kInner: KInner): KInner => {
       if (!(kInner instanceof KApply)) return kInner;
 
-      const prod = this.symbols.get(kInner.label.name)!;
+      const prod = this.symbols[kInner.label.name]!;
       return new KApply(
         kInner.label,
         kInner.args.map((arg, i) => {
@@ -1790,9 +1791,9 @@ export class KDefinition
     const addSortParamsInner = (k: KInner): KInner => {
       if (!(k instanceof KApply)) return k;
 
-      const prod = this.symbols.get(k.label.name)!;
+      const prod = this.symbols[k.label.name]!;
       if (k.label.params.length === 0 && prod.params.length > 0) {
-        const sortDict = new Map<KSort, KSort>();
+        const sortDict: Record<string, KSort> = {};
         for (let i = 0; i < prod.argumentSorts.length; i++) {
           const psort = prod.argumentSorts[i]!;
           const asort = this.sort(k.args[i]!);
@@ -1807,26 +1808,26 @@ export class KDefinition
             return k;
           }
           if (prod.params.includes(psort)) {
-            if (sortDict.has(psort) && sortDict.get(psort) !== asort) {
+            if (psort.name in sortDict && sortDict[psort.name] !== asort) {
               console.warn(
                 `Failed to add sort parameter, sort mismatch: ${[
                   prod,
                   psort,
-                  sortDict.get(psort),
+                  sortDict[psort.name],
                   asort,
                 ]}`
               );
               return k;
-            } else if (!sortDict.has(psort)) {
-              sortDict.set(psort, asort);
+            } else if (!(psort.name in sortDict)) {
+              sortDict[psort.name] = asort;
             }
           }
         }
-        if (prod.params.every((p) => sortDict.has(p))) {
+        if (prod.params.every((p) => p.name in sortDict)) {
           return k.let({
             label: new KLabel(
               k.label.name,
-              prod.params.map((p) => sortDict.get(p)!)
+              prod.params.map((p) => sortDict[p.name]!)
             ),
           });
         }
@@ -1841,18 +1842,18 @@ export class KDefinition
     /**
      * Wrap cell-map items in the syntactical wrapper that the frontend generates for them.
      */
-    const cellWrappers = new Map<string, string>();
+    const cellWrappers: Record<string, string> = {};
     for (const ccp of this.cellCollectionProductions) {
       const element = ccp.att.get(Atts.ELEMENT);
       const wrapElement = ccp.att.get(Atts.WRAP_ELEMENT);
       if (element && wrapElement) {
-        cellWrappers.set(wrapElement, element);
+        cellWrappers[wrapElement] = element;
       }
     }
 
     const wrapElements = (k: KInner): KInner => {
-      if (k instanceof KApply && cellWrappers.has(k.label.name)) {
-        return new KApply(cellWrappers.get(k.label.name)!, [k.args[0]!, k]);
+      if (k instanceof KApply && k.label.name in cellWrappers) {
+        return new KApply(cellWrappers[k.label.name]!, [k.args[0]!, k]);
       }
       return k;
     };
@@ -1865,22 +1866,22 @@ export class KDefinition
     /**
      * Remove cell-map syntactical wrapper items that the frontend generates.
      */
-    const cellWrappers = new Map<string, string>();
+    const cellWrappers: Record<string, string> = {};
     for (const ccp of this.cellCollectionProductions) {
       const element = ccp.att.get(Atts.ELEMENT);
       const wrapElement = ccp.att.get(Atts.WRAP_ELEMENT);
       if (element && wrapElement) {
-        cellWrappers.set(element, wrapElement);
+        cellWrappers[element] = wrapElement;
       }
     }
 
     const unwrapElements = (k: KInner): KInner => {
       if (
         k instanceof KApply &&
-        cellWrappers.has(k.label.name) &&
+        k.label.name in cellWrappers &&
         k.args.length === 2 &&
         k.args[1] instanceof KApply &&
-        k.args[1].label.name === cellWrappers.get(k.label.name)
+        k.args[1].label.name === cellWrappers[k.label.name]
       ) {
         return k.args[1];
       }
@@ -1894,16 +1895,17 @@ export class KDefinition
     /**
      * Given a cell-sort, compute an "empty" configuration for it.
      */
-    if (!this._emptyConfig.has(sort)) {
-      this._emptyConfig.set(sort, this.computeEmptyConfig(sort));
+    const sortKey = sort.name;
+    if (!(sortKey in this._emptyConfig)) {
+      this._emptyConfig[sortKey] = this.computeEmptyConfig(sort);
     }
-    return this._emptyConfig.get(sort)!;
+    return this._emptyConfig[sortKey]!;
   }
 
   private computeEmptyConfig(sort: KSort): KInner {
     const cellProd = this.productionForCellSort(sort);
     const cellKlabel = cellProd.klabel!;
-    const production = this.symbols.get(cellKlabel.name)!;
+    const production = this.symbols[cellKlabel.name]!;
     const args: KInner[] = [];
     let numNonterminals = 0;
     let numFreshvars = 0;
@@ -1938,7 +1940,7 @@ export class KDefinition
      */
     const cellVarsToLabels = (kast: KInner): KInner => {
       if (kast instanceof KApply && kast.isCell) {
-        const production = this.symbols.get(kast.label.name)!;
+        const production = this.symbols[kast.label.name]!;
         const productionArity = production.nonTerminals.map(
           (item) => item.sort
         );
@@ -1966,10 +1968,11 @@ export class KDefinition
      * Return an initialized configuration as the user declares it in the semantics,
      * complete with configuration variables in place.
      */
-    if (!this._initConfig.has(sort)) {
-      this._initConfig.set(sort, this.computeInitConfig(sort));
+    const sortKey = sort.name;
+    if (!(sortKey in this._initConfig)) {
+      this._initConfig[sortKey] = this.computeInitConfig(sort);
     }
-    return this._initConfig.get(sort)!;
+    return this._initConfig[sortKey]!;
   }
 
   private computeInitConfig(sort: KSort): KInner {
@@ -2039,6 +2042,6 @@ export function readKastDefinition(path: string): KDefinition {
   console.info(`Loading JSON definition: ${path}`);
   const jsonDefn = JSON.parse(fs.readFileSync(path, "utf8"));
   console.info(`Converting JSON definition to Kast: ${path}`);
-  const mapDefn = new Map(Object.entries(kastTerm(jsonDefn)));
-  return KDefinition.fromDict(mapDefn);
+  const kastDefn = kastTerm(jsonDefn);
+  return KDefinition.fromDict(kastDefn);
 }

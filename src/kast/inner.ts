@@ -94,17 +94,21 @@ export abstract class KInner extends KAst {
     return KInner.fromDict(JSON.parse(s));
   }
 
-  public static async fromJsonAsync(s: string): Promise<KInner> {
-    return KInner.fromDictAsync(JSON.parse(s));
+  public static async fromJsonAsync(
+    s: string,
+    yieldFrequency = 10
+  ): Promise<KInner> {
+    return KInner.fromDictAsync(JSON.parse(s), 0, yieldFrequency);
   }
 
   // Async version to break up call stack using Promises
   public static async fromDictAsync(
     dct: Record<string, any>,
-    depth = 0
+    depth = 0,
+    yieldFrequency = 10
   ): Promise<KInner> {
-    // Every few levels, yield control to prevent stack overflow
-    if (depth % 10 === 0 && depth > 0) {
+    // Every yieldFrequency levels, yield control to prevent stack overflow
+    if (depth % yieldFrequency === 0 && depth > 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
@@ -117,27 +121,27 @@ export abstract class KInner extends KAst {
       case "KApply":
         const args = await Promise.all(
           (dct.args || []).map((arg: any) =>
-            KInner.fromDictAsync(arg, depth + 1)
+            KInner.fromDictAsync(arg, depth + 1, yieldFrequency)
           )
         );
         return KApply._fromDict(dct, args);
       case "KSequence":
         const items = await Promise.all(
           (dct.items || []).map((item: any) =>
-            KInner.fromDictAsync(item, depth + 1)
+            KInner.fromDictAsync(item, depth + 1, yieldFrequency)
           )
         );
         return KSequence._fromDict(dct, items);
       case "KRewrite":
         const [lhs, rhs] = await Promise.all([
-          KInner.fromDictAsync(dct.lhs, depth + 1),
-          KInner.fromDictAsync(dct.rhs, depth + 1),
+          KInner.fromDictAsync(dct.lhs, depth + 1, yieldFrequency),
+          KInner.fromDictAsync(dct.rhs, depth + 1, yieldFrequency),
         ]);
         return KRewrite._fromDict(dct, [lhs, rhs]);
       case "KAs":
         const [pattern, alias] = await Promise.all([
-          KInner.fromDictAsync(dct.pattern, depth + 1),
-          KInner.fromDictAsync(dct.alias, depth + 1),
+          KInner.fromDictAsync(dct.pattern, depth + 1, yieldFrequency),
+          KInner.fromDictAsync(dct.alias, depth + 1, yieldFrequency),
         ]);
         return KAs._fromDict(dct, [pattern, alias]);
       default:

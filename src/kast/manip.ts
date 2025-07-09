@@ -127,10 +127,10 @@ export function boolToMlPred(
   sort: KSort = GENERATED_TOP_CELL
 ): KInner {
   function boolConstraintToMl(k: KInner): KInner {
-    if (k === TRUE) {
+    if (k.equals(TRUE)) {
       return mlTop(sort);
     }
-    if (k === FALSE) {
+    if (k.equals(FALSE)) {
       return mlBottom(sort);
     }
     return mlEqualsTrue(k, sort);
@@ -166,10 +166,10 @@ export function mlPredToBool(kast: KInner, unsafe: boolean = false): KInner {
           break;
         case "#Equals": {
           const [first, second] = k.args;
-          if (first === TRUE) return second!;
-          if (first === FALSE) return notBool(second!);
-          if (second === TRUE) return first!;
-          if (second === FALSE) return notBool(first!);
+          if (first!.equals(TRUE)) return second!;
+          if (first!.equals(FALSE)) return notBool(second!);
+          if (second!.equals(TRUE)) return first!;
+          if (second!.equals(FALSE)) return notBool(first!);
 
           if (first instanceof KVariable || first instanceof KToken) {
             const sort = first.sort;
@@ -364,14 +364,14 @@ export function extractSubst(term: KInner): [Subst, KInner] {
       return [term2.name, term1];
     }
     if (
-      term1 === TRUE &&
+      term1.equals(TRUE) &&
       term2 instanceof KApply &&
       ["_==K_", "_==Int_"].includes(term2.label.name)
     ) {
       return extractSubstInner(term2.args[0]!, term2.args[1]!);
     }
     if (
-      term2 === TRUE &&
+      term2.equals(TRUE) &&
       term1 instanceof KApply &&
       ["_==K_", "_==Int_"].includes(term1.label.name)
     ) {
@@ -852,12 +852,12 @@ export function undoAliases(definition: KDefinition, kast: KInner): KInner {
     if (!(rewrite instanceof KRewrite)) {
       throw new Error(`Expected KRewrite as alias body, found: ${rewrite}`);
     }
-    if (rule.requires !== null && rule.requires !== TRUE) {
+    if (rule.requires !== null && !rule.requires.equals(TRUE)) {
       throw new Error(
         `Expected empty requires clause on alias, found: ${rule.requires}`
       );
     }
-    if (rule.ensures !== null && rule.ensures !== TRUE) {
+    if (rule.ensures !== null && !rule.ensures.equals(TRUE)) {
       throw new Error(
         `Expected empty ensures clause on alias, found: ${rule.ensures}`
       );
@@ -1020,7 +1020,7 @@ export function buildClaim(
       constraint instanceof KApply &&
       constraint.label.name === "#Equals" &&
       constraint.args.length === 2 &&
-      constraint.args[0] === TRUE
+      constraint.args[0]!.equals(TRUE)
     ) {
       return constraint.args[1]!;
     }

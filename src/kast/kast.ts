@@ -1,3 +1,4 @@
+import { deepEqual } from "fast-equals";
 import { hashStr } from "../utils";
 
 export abstract class KAst {
@@ -19,8 +20,8 @@ export abstract class KAst {
   }
 
   public equals(other: KAst): boolean {
-    // Simple structural equality check using JSON serialization
-    return JSON.stringify(this.toJson()) === JSON.stringify(other.toJson());
+    // Use fast-equals library to avoid stack overflow
+    return deepEqual(this, other);
   }
 
   public get hash(): string {

@@ -8,12 +8,18 @@ import {
 } from "../kast/inner";
 import { freeVars, minimizeTerm } from "../kast/manip";
 import { DOTS } from "../kast/prelude/k";
+import { PrettyPrinter } from "../kast/pretty";
 import { CTerm } from "./cterm";
 
 /**
  * Printer function type that takes a KInner and returns a string representation.
  */
 export type Printer = (kast: KInner) => string;
+
+/**
+ * Async printer function type that takes a KInner and returns a promise of string representation.
+ */
+export type AsyncPrinter = (kast: KInner) => Promise<string>;
 
 /**
  * Configuration class for controlling how CTerm instances are displayed.
@@ -24,20 +30,26 @@ export type Printer = (kast: KInner) => string;
  */
 export class CTermShow {
   private readonly _printer: Printer;
+  private readonly _asyncPrinter?: AsyncPrinter;
   private readonly _minimize: boolean;
   private readonly _breakCellCollections: boolean;
   private readonly _omitLabels: readonly string[];
+  private readonly _yieldFrequency: number;
 
   constructor(
     printer: Printer,
     minimize: boolean = true,
     breakCellCollections: boolean = true,
-    omitLabels: Iterable<string> = []
+    omitLabels: Iterable<string> = [],
+    asyncPrinter?: AsyncPrinter,
+    yieldFrequency: number = 10
   ) {
     this._printer = printer;
+    this._asyncPrinter = asyncPrinter;
     this._minimize = minimize;
     this._breakCellCollections = breakCellCollections;
     this._omitLabels = Array.from(omitLabels);
+    this._yieldFrequency = yieldFrequency;
   }
 
   /**
@@ -59,9 +71,24 @@ export class CTermShow {
    */
   public async printLinesAsync(kast: KInner): Promise<string[]> {
     // Yield control before calling the printer to prevent stack overflow
+    console.log("printLinesAsync: Starting, about to yield control");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const printed = this._printer(kast);
-    return printed.split("\n");
+
+    let printed: string;
+    if (this._asyncPrinter) {
+      console.log("printLinesAsync: Using async printer");
+      printed = await this._asyncPrinter(kast);
+      console.log("printLinesAsync: Async printer completed");
+    } else {
+      console.log("printLinesAsync: Using sync printer");
+      printed = this._printer(kast);
+      console.log("printLinesAsync: Sync printer completed");
+    }
+
+    console.log("printLinesAsync: About to split lines");
+    const result = printed.split("\n");
+    console.log("printLinesAsync: Finished, returning", result.length, "lines");
+    return result;
   }
 
   /**
@@ -85,7 +112,9 @@ export class CTermShow {
         : this._breakCellCollections,
       options.omitLabels !== undefined
         ? Array.from(options.omitLabels)
-        : this._omitLabels
+        : this._omitLabels,
+      this._asyncPrinter,
+      this._yieldFrequency
     );
   }
 
@@ -140,47 +169,55 @@ export class CTermShow {
    * This prevents stack overflow errors when dealing with deeply nested configurations.
    *
    * @param cterm - The CTerm whose configuration should be displayed.
-   * @param yieldFrequency - How often to yield control (default: 10).
    * @returns A promise that resolves to an array of strings representing the formatted configuration.
    */
-  public async showConfigAsync(
-    cterm: CTerm,
-    yieldFrequency: number = 10
-  ): Promise<string[]> {
+  public async showConfigAsync(cterm: CTerm): Promise<string[]> {
+    console.log("showConfigAsync: Starting");
     let workingCterm = cterm;
 
     if (this._breakCellCollections) {
+      console.log("showConfigAsync: About to break cell collections");
       workingCterm = new CTerm(
         await this._topDownAsyncVisitor(
           (kast) => this._breakCellsVisitorAsync(kast),
-          cterm.config,
-          0,
-          yieldFrequency
+          cterm.config
         ),
         cterm.constraints
       );
+      console.log("showConfigAsync: Finished breaking cell collections");
+    } else {
+      console.log("showConfigAsync: Skipping cell collection breaking");
     }
 
     if (this._omitLabels.length > 0) {
+      console.log("showConfigAsync: About to omit labels");
       workingCterm = new CTerm(
         await this._topDownAsync(
           (kast) => this._omitLabelsVisitor(kast),
-          workingCterm.config,
-          0,
-          yieldFrequency
+          workingCterm.config
         ),
         workingCterm.constraints
       );
+      console.log("showConfigAsync: Finished omitting labels");
+    } else {
+      console.log("showConfigAsync: Skipping label omission");
     }
 
     if (this._minimize) {
+      console.log("showConfigAsync: About to minimize term");
       workingCterm = new CTerm(
         minimizeTerm(workingCterm.config, freeVars(workingCterm.constraint)),
         workingCterm.constraints
       );
+      console.log("showConfigAsync: Finished minimizing term");
+    } else {
+      console.log("showConfigAsync: Skipping term minimization");
     }
 
-    return await this.printLinesAsync(workingCterm.config);
+    console.log("showConfigAsync: About to call printLinesAsync");
+    const result = await this.printLinesAsync(workingCterm.config);
+    console.log("showConfigAsync: Finished printLinesAsync");
+    return result;
   }
 
   /**
@@ -253,7 +290,7 @@ export class CTermShow {
       const printedItems: string[] = [];
       for (let i = 0; i < items.length; i++) {
         // Yield control periodically
-        if (i % 10 === 0 && i > 0) {
+        if (i % this._yieldFrequency === 0 && i > 0) {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
         const item = items[i];
@@ -294,17 +331,15 @@ export class CTermShow {
    * @param f - The transformation function to apply to each node.
    * @param term - The term to traverse.
    * @param depth - Current recursion depth.
-   * @param yieldFrequency - How often to yield control.
    * @returns A promise that resolves to the transformed term.
    */
   private async _topDownAsync(
     f: (term: KInner) => KInner,
     term: KInner,
-    depth: number = 0,
-    yieldFrequency: number = 10
+    depth: number = 0
   ): Promise<KInner> {
     // Every yieldFrequency levels, yield control to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
+    if (depth % this._yieldFrequency === 0 && depth > 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
@@ -317,7 +352,7 @@ export class CTermShow {
     // Process all child terms asynchronously
     const transformedChildren = await Promise.all(
       transformedTerm.terms.map((childTerm) =>
-        this._topDownAsync(f, childTerm, depth + 1, yieldFrequency)
+        this._topDownAsync(f, childTerm, depth + 1)
       )
     );
 
@@ -331,17 +366,15 @@ export class CTermShow {
    * @param f - The async transformation function to apply to each node.
    * @param term - The term to traverse.
    * @param depth - Current recursion depth.
-   * @param yieldFrequency - How often to yield control.
    * @returns A promise that resolves to the transformed term.
    */
   private async _topDownAsyncVisitor(
     f: (term: KInner) => Promise<KInner>,
     term: KInner,
-    depth: number = 0,
-    yieldFrequency: number = 10
+    depth: number = 0
   ): Promise<KInner> {
     // Every yieldFrequency levels, yield control to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
+    if (depth % this._yieldFrequency === 0 && depth > 0) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
@@ -354,10 +387,41 @@ export class CTermShow {
     // Process all child terms asynchronously
     const transformedChildren = await Promise.all(
       transformedTerm.terms.map((childTerm) =>
-        this._topDownAsyncVisitor(f, childTerm, depth + 1, yieldFrequency)
+        this._topDownAsyncVisitor(f, childTerm, depth + 1)
       )
     );
 
     return transformedTerm.letTerms(transformedChildren);
   }
+}
+
+/**
+ * Create a CTermShow instance with async printing support for PrettyPrinter.
+ * This helps prevent stack overflow when dealing with deeply nested structures.
+ *
+ * @param prettyPrinter - The PrettyPrinter instance to use for printing.
+ * @param options - Configuration options for the CTermShow.
+ * @returns A CTermShow instance with both sync and async printing capabilities.
+ */
+export function createAsyncCTermShow(
+  prettyPrinter: PrettyPrinter,
+  options: {
+    minimize?: boolean;
+    breakCellCollections?: boolean;
+    omitLabels?: Iterable<string>;
+    yieldFrequency?: number;
+  } = {}
+): CTermShow {
+  const yieldFreq = options.yieldFrequency ?? 1; // Much more aggressive yielding
+  const syncPrinter = (kast: KInner) => prettyPrinter.print(kast);
+  const asyncPrinter = (kast: KInner) => prettyPrinter.printAsync(kast);
+
+  return new CTermShow(
+    syncPrinter,
+    options.minimize ?? true,
+    options.breakCellCollections ?? true,
+    options.omitLabels || [],
+    asyncPrinter,
+    yieldFreq
+  );
 }

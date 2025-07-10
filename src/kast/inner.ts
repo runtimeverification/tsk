@@ -873,10 +873,105 @@ export function bottomUp(f: (term: KInner) => KInner, kinner: KInner): KInner {
   }
 }
 
+export async function bottomUpAsync(
+  f: (term: KInner) => KInner,
+  kinner: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  console.log("bottomUpAsync: Starting");
+  const stack: any[] = [kinner, []];
+  let operations = 0;
+
+  while (true) {
+    // Yield control periodically
+    if (operations % yieldFrequency === 0 && operations > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    operations++;
+
+    if (operations % 1000 === 0) {
+      console.log(
+        "bottomUpAsync: Processed",
+        operations,
+        "operations, stack size:",
+        stack.length
+      );
+    }
+
+    const terms = stack[stack.length - 1];
+    const term = stack[stack.length - 2];
+    const idx = terms.length; // The next child index to process
+
+    if (idx === term.terms.length) {
+      // We've processed all children
+      stack.pop();
+      stack.pop();
+      const transformedTerm = f(term.letTerms(terms));
+      if (!stack || stack.length === 0) {
+        console.log("bottomUpAsync: Finished after", operations, "operations");
+        return transformedTerm;
+      }
+      stack[stack.length - 1].push(transformedTerm);
+    } else {
+      // Process the next child
+      stack.push(term.terms[idx]);
+      stack.push([]);
+    }
+
+    // Safety check for runaway operations
+    if (operations > 100000) {
+      console.error(
+        "bottomUpAsync: Too many operations, breaking to prevent infinite loop"
+      );
+      console.error("bottomUpAsync: Final stack size:", stack.length);
+      throw new Error("bottomUpAsync exceeded maximum operations");
+    }
+  }
+}
+
 export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {
   const stack: any[] = [f(term), []];
 
   while (true) {
+    const terms = stack[stack.length - 1];
+    const currentTerm = stack[stack.length - 2];
+    const idx = terms.length; // The next child index to process
+
+    if (idx === currentTerm.terms.length) {
+      // We've processed all children
+      stack.pop();
+      stack.pop();
+      const termWithNewChildren = currentTerm.letTerms(terms);
+      if (stack.length === 0) {
+        return termWithNewChildren;
+      }
+      stack[stack.length - 1].push(termWithNewChildren);
+    } else {
+      // Process the next child
+      stack.push(f(currentTerm.terms[idx]));
+      stack.push([]);
+    }
+  }
+}
+
+/**
+ * Async version of topDown that yields control periodically to prevent blocking the main thread.
+ */
+export async function topDownAsync(
+  f: (term: KInner) => KInner,
+  term: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  const stack: any[] = [f(term), []];
+  let operations = 0;
+
+  while (true) {
+    // Yield control periodically
+    if (operations % yieldFrequency === 0 && operations > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    operations++;
+
     const terms = stack[stack.length - 1];
     const currentTerm = stack[stack.length - 2];
     const idx = terms.length; // The next child index to process

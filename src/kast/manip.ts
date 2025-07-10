@@ -24,6 +24,7 @@ import {
   flattenLabel,
   keepVarsSorted,
   topDown,
+  topDownAsync,
   varOccurrences,
 } from "./inner";
 import { KClaim, KDefinition, KFlatModule, KRule, KRuleLike } from "./outer";
@@ -46,7 +47,7 @@ import {
   mlOr,
   mlTop,
 } from "./prelude/ml";
-import { indexedRewrite } from "./rewrite";
+import { indexedRewrite, indexedRewriteAsync } from "./rewrite";
 
 export function isTermLike(kast: KInner): boolean {
   let nonTermFound = false;
@@ -108,6 +109,29 @@ export function sortAcCollections(kast: KInner): KInner {
   }
 
   return topDown(sortAcCollectionsInner, kast);
+}
+
+/**
+ * Async version of sortAcCollections that yields control periodically to prevent stack overflow.
+ */
+export async function sortAcCollectionsAsync(
+  kast: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  function sortAcCollectionsInner(k: KInner): KInner {
+    if (k instanceof KApply) {
+      const acLabels = ["_Set_", "_Map_", "_RangeMap_"];
+      if (
+        acLabels.includes(k.label.name) ||
+        k.label.name.endsWith("CellMap_")
+      ) {
+        return sortAssocLabel(k.label.name, k);
+      }
+    }
+    return k;
+  }
+
+  return topDownAsync(sortAcCollectionsInner, kast, yieldFrequency);
 }
 
 export function ifKtype<T extends KInner>(
@@ -865,6 +889,64 @@ export function undoAliases(definition: KDefinition, kast: KInner): KInner {
     aliases.push(new KRewrite(rewrite.rhs, rewrite.lhs));
   }
   return indexedRewrite(kast, aliases);
+}
+
+/**
+ * Async version of undoAliases that yields control periodically to prevent stack overflow.
+ */
+export async function undoAliasesAsync(
+  definition: KDefinition,
+  kast: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  console.log("undoAliasesAsync: Starting, checking alias rules...");
+  console.log(
+    "undoAliasesAsync: Total alias rules:",
+    definition.aliasRules.length
+  );
+
+  // Add a safety limit to prevent processing too many aliases
+  const maxAliases = 100;
+  if (definition.aliasRules.length > maxAliases) {
+    console.warn(
+      `undoAliasesAsync: Too many alias rules (${definition.aliasRules.length}), limiting to ${maxAliases}`
+    );
+  }
+
+  const aliases: KRewrite[] = [];
+  const aliasRulesToProcess = definition.aliasRules.slice(0, maxAliases);
+
+  for (let i = 0; i < aliasRulesToProcess.length; i++) {
+    const rule = aliasRulesToProcess[i]!;
+    console.log(
+      `undoAliasesAsync: Processing alias rule ${i + 1}/${
+        aliasRulesToProcess.length
+      }`
+    );
+
+    const rewrite = rule.body;
+    if (!(rewrite instanceof KRewrite)) {
+      throw new Error(`Expected KRewrite as alias body, found: ${rewrite}`);
+    }
+    if (rule.requires !== null && !rule.requires.equals(TRUE)) {
+      throw new Error(
+        `Expected empty requires clause on alias, found: ${rule.requires}`
+      );
+    }
+    if (rule.ensures !== null && !rule.ensures.equals(TRUE)) {
+      throw new Error(
+        `Expected empty ensures clause on alias, found: ${rule.ensures}`
+      );
+    }
+    aliases.push(new KRewrite(rewrite.rhs, rewrite.lhs));
+  }
+
+  console.log(
+    `undoAliasesAsync: Built ${aliases.length} aliases, calling indexedRewriteAsync...`
+  );
+  const result = await indexedRewriteAsync(kast, aliases, yieldFrequency);
+  console.log("undoAliasesAsync: Finished");
+  return result;
 }
 
 export function renameGeneratedVars(term: KInner): KInner {

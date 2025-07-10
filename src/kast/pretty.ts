@@ -12,7 +12,12 @@ import {
   KVariable,
 } from "./inner";
 import type { KAst } from "./kast";
-import { sortAcCollections, undoAliases } from "./manip";
+import {
+  sortAcCollections,
+  sortAcCollectionsAsync,
+  undoAliases,
+  undoAliasesAsync,
+} from "./manip";
 import {
   KBubble,
   KClaim,
@@ -43,6 +48,7 @@ export class PrettyPrinter {
   private readonly patchSymbolTable?: (symbolTable: SymbolTable) => void;
   private readonly unalias: boolean;
   private readonly sortCollections: boolean;
+  private readonly _yieldFrequency: number;
   private cachedSymbolTable?: SymbolTable;
 
   constructor(options: {
@@ -51,12 +57,14 @@ export class PrettyPrinter {
     patchSymbolTable?: (symbolTable: SymbolTable) => void;
     unalias?: boolean;
     sortCollections?: boolean;
+    yieldFrequency?: number;
   }) {
     this.definition = options.definition;
     this.extraUnparsingModules = options.extraUnparsingModules || [];
     this.patchSymbolTable = options.patchSymbolTable;
     this.unalias = options.unalias ?? true;
     this.sortCollections = options.sortCollections ?? false;
+    this._yieldFrequency = options.yieldFrequency ?? 1;
   }
 
   get symbolTable(): SymbolTable {
@@ -102,7 +110,107 @@ export class PrettyPrinter {
     throw new Error(`Error unparsing: ${kast}`);
   }
 
+  async printAsync(kast: KAst, depth: number = 0): Promise<string> {
+    // Yield control periodically to prevent stack overflow - yield every call at depth 0
+    if (depth === 0 || depth % this._yieldFrequency === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    if (kast instanceof KAtt) {
+      return this.printKAtt(kast);
+    }
+    if (kast instanceof KSort) {
+      return this.printKSort(kast);
+    }
+    if (kast instanceof KLabel) {
+      return this.printKLabel(kast);
+    }
+    if (kast instanceof KOuter) {
+      return await this.printKOuterAsync(kast, depth + 1);
+    }
+    if (kast instanceof KInner) {
+      let inner = kast;
+      if (this.unalias) {
+        inner = await undoAliasesAsync(
+          this.definition,
+          inner,
+          this._yieldFrequency
+        );
+      }
+      if (this.sortCollections) {
+        inner = await sortAcCollectionsAsync(inner, this._yieldFrequency);
+      }
+      return await this.printKInnerAsync(inner, depth + 1);
+    }
+
+    throw new Error(`Error unparsing: ${kast}`);
+  }
+
   private printKOuter(kast: KOuter): string {
+    if (kast instanceof KTerminal) {
+      return this.printKTerminal(kast);
+    }
+    if (kast instanceof KRegexTerminal) {
+      return this.printKRegexTerminal(kast);
+    }
+    if (kast instanceof KNonTerminal) {
+      return this.printKNonTerminal(kast);
+    }
+    if (kast instanceof KProduction) {
+      return this.printKProduction(kast);
+    }
+    if (kast instanceof KSyntaxSort) {
+      return this.printKSyntaxSort(kast);
+    }
+    if (kast instanceof KSortSynonym) {
+      return this.printKSortSynonym(kast);
+    }
+    if (kast instanceof KSyntaxLexical) {
+      return this.printKSyntaxLexical(kast);
+    }
+    if (kast instanceof KSyntaxAssociativity) {
+      return this.printKSyntaxAssociativity(kast);
+    }
+    if (kast instanceof KSyntaxPriority) {
+      return this.printKSyntaxPriority(kast);
+    }
+    if (kast instanceof KBubble) {
+      return this.printKBubble(kast);
+    }
+    if (kast instanceof KRule) {
+      return this.printKRule(kast);
+    }
+    if (kast instanceof KClaim) {
+      return this.printKClaim(kast);
+    }
+    if (kast instanceof KContext) {
+      return this.printKContext(kast);
+    }
+    if (kast instanceof KImport) {
+      return this.printKImport(kast);
+    }
+    if (kast instanceof KFlatModule) {
+      return this.printKFlatModule(kast);
+    }
+    if (kast instanceof KRequire) {
+      return this.printKRequire(kast);
+    }
+    if (kast instanceof KDefinition) {
+      return this.printKDefinition(kast);
+    }
+
+    throw new Error(`Error unparsing: ${kast}`);
+  }
+
+  private async printKOuterAsync(
+    kast: KOuter,
+    depth: number = 0
+  ): Promise<string> {
+    // Yield control periodically to prevent stack overflow
+    if (depth % this._yieldFrequency === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
     if (kast instanceof KTerminal) {
       return this.printKTerminal(kast);
     }
@@ -181,6 +289,189 @@ export class PrettyPrinter {
     throw new Error(`Error unparsing: ${kast}`);
   }
 
+  private async printKInnerAsync(
+    kast: KInner,
+    depth: number = 0
+  ): Promise<string> {
+    // Yield control periodically to prevent stack overflow
+    if (depth % this._yieldFrequency === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    if (depth === 0) {
+      console.log("printKInnerAsync: Starting at depth 0");
+    }
+
+    if (depth % 100 === 0 && depth > 0) {
+      console.log(
+        "printKInnerAsync: Reached depth",
+        depth,
+        "node type:",
+        kast.constructor.name
+      );
+    }
+
+    if (kast instanceof KVariable) {
+      return this.printKVariable(kast);
+    }
+    if (kast instanceof KToken) {
+      return this.printKToken(kast);
+    }
+    if (kast instanceof KApply) {
+      if (depth === 0)
+        console.log("printKInnerAsync: Processing KApply at depth 0");
+      return await this.printKApplyAsync(kast, depth + 1);
+    }
+    if (kast instanceof KAs) {
+      if (depth === 0)
+        console.log("printKInnerAsync: Processing KAs at depth 0");
+      return await this.printKAsAsync(kast, depth + 1);
+    }
+    if (kast instanceof KRewrite) {
+      if (depth === 0)
+        console.log("printKInnerAsync: Processing KRewrite at depth 0");
+      return await this.printKRewriteAsync(kast, depth + 1);
+    }
+    if (kast instanceof KSequence) {
+      if (depth === 0)
+        console.log("printKInnerAsync: Processing KSequence at depth 0");
+      return await this.printKSequenceAsync(kast, depth + 1);
+    }
+
+    throw new Error(`Error unparsing: ${kast}`);
+  }
+
+  /**
+   * Iterative version of printKInnerAsync that uses explicit stacks to avoid recursion
+   */
+  private async printKInnerIterative(kast: KInner): Promise<string> {
+    type StackItem = {
+      node: KInner;
+      type: "process" | "combine";
+      result?: string;
+      args?: string[];
+      argIndex?: number;
+    };
+
+    const stack: StackItem[] = [{ node: kast, type: "process" }];
+    const results: string[] = [];
+    let operations = 0;
+
+    while (stack.length > 0) {
+      // Yield control periodically
+      if (operations % this._yieldFrequency === 0 && operations > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      operations++;
+
+      const item = stack.pop()!;
+
+      if (item.type === "combine") {
+        // We're combining results from child nodes
+        if (item.node instanceof KApply) {
+          const label = item.node.label.name;
+          const args = item.args!;
+
+          if (item.node.isCell) {
+            const cellContents = args.join("\n").trimEnd();
+            const cellStr = `${label}\n${indent(cellContents)}\n</${label.slice(
+              1
+            )}`;
+            results.push(cellStr.trimEnd());
+          } else {
+            const unparser =
+              label in this.symbolTable
+                ? this.symbolTable[label]
+                : this.appliedLabelStr(label);
+            results.push(unparser!(...args));
+          }
+        } else if (item.node instanceof KAs) {
+          const [patternStr, aliasStr] = item.args!;
+          results.push(`${patternStr} #as ${aliasStr}`);
+        } else if (item.node instanceof KRewrite) {
+          const [lhsStr, rhsStr] = item.args!;
+          results.push(`( ${lhsStr} => ${rhsStr} )`);
+        } else if (item.node instanceof KSequence) {
+          const args = item.args!;
+          if (args.length === 0) {
+            results.push(".K");
+          } else if (args.length === 1) {
+            results.push(`${args[0]} ~> .K`);
+          } else {
+            const items = args.slice(0, -1).join("\n~> ");
+            const lastItem = args[args.length - 1]!;
+            const lastNode = item.node.items[item.node.items.length - 1]!;
+            if (
+              lastNode instanceof KToken &&
+              lastNode.token === "..." &&
+              lastNode.sort.name === "K"
+            ) {
+              results.push(`${items}\n${lastItem}`);
+            } else {
+              results.push(`${items}\n~> ${lastItem}`);
+            }
+          }
+        }
+        continue;
+      }
+
+      // Processing a node
+      const node = item.node;
+
+      if (node instanceof KVariable) {
+        results.push(this.printKVariable(node));
+      } else if (node instanceof KToken) {
+        results.push(this.printKToken(node));
+      } else if (node instanceof KApply) {
+        // Push a combine item first (will be processed after children)
+        stack.push({
+          node: node,
+          type: "combine",
+          args: new Array(node.args.length),
+        });
+
+        // Push child processing items (in reverse order so they're processed left-to-right)
+        for (let i = node.args.length - 1; i >= 0; i--) {
+          stack.push({ node: node.args[i]!, type: "process" });
+        }
+      } else if (node instanceof KAs) {
+        stack.push({
+          node: node,
+          type: "combine",
+          args: new Array(2),
+        });
+        stack.push({ node: node.alias, type: "process" });
+        stack.push({ node: node.pattern, type: "process" });
+      } else if (node instanceof KRewrite) {
+        stack.push({
+          node: node,
+          type: "combine",
+          args: new Array(2),
+        });
+        stack.push({ node: node.rhs, type: "process" });
+        stack.push({ node: node.lhs, type: "process" });
+      } else if (node instanceof KSequence) {
+        if (node.arity === 0) {
+          results.push(".K");
+        } else {
+          stack.push({
+            node: node,
+            type: "combine",
+            args: new Array(node.items.length),
+          });
+
+          for (let i = node.items.length - 1; i >= 0; i--) {
+            stack.push({ node: node.items[i]!, type: "process" });
+          }
+        }
+      } else {
+        throw new Error(`Error unparsing: ${node}`);
+      }
+    }
+
+    return results[results.length - 1] || "";
+  }
+
   private printKSort(ksort: KSort): string {
     return ksort.name;
   }
@@ -219,15 +510,102 @@ export class PrettyPrinter {
     return unparser!(...unparsedArgs);
   }
 
+  private async printKApplyAsync(
+    kapply: KApply,
+    depth: number = 0
+  ): Promise<string> {
+    // Yield control periodically to prevent stack overflow
+    if (depth % this._yieldFrequency === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const label = kapply.label.name;
+    const args = kapply.args;
+
+    if (depth === 0) {
+      console.log(
+        "printKApplyAsync: Starting at depth 0, label:",
+        label,
+        "args count:",
+        args.length
+      );
+    }
+
+    if (depth % 50 === 0 && depth > 0) {
+      console.log(
+        "printKApplyAsync: Depth",
+        depth,
+        "label:",
+        label,
+        "args:",
+        args.length
+      );
+    }
+
+    // Process args asynchronously to prevent stack overflow
+    const unparsedArgs: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+      if (depth === 0 && i % 10 === 0) {
+        console.log(
+          "printKApplyAsync: Processing arg",
+          i + 1,
+          "of",
+          args.length
+        );
+      }
+
+      // Yield more frequently when processing arguments
+      if (
+        i % Math.max(1, Math.floor(this._yieldFrequency / 2)) === 0 &&
+        i > 0
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      unparsedArgs.push(await this.printKInnerAsync(args[i]!, depth + 1));
+    }
+
+    if (depth === 0) {
+      console.log("printKApplyAsync: Finished processing all args at depth 0");
+    }
+
+    if (kapply.isCell) {
+      const cellContents = unparsedArgs.join("\n").trimEnd();
+      const cellStr = `${label}\n${indent(cellContents)}\n</${label.slice(1)}`;
+      return cellStr.trimEnd();
+    }
+
+    const unparser =
+      label in this.symbolTable
+        ? this.symbolTable[label]
+        : this.appliedLabelStr(label);
+
+    return unparser!(...unparsedArgs);
+  }
+
   private printKAs(kas: KAs): string {
     const patternStr = this.printKInner(kas.pattern);
     const aliasStr = this.printKInner(kas.alias);
     return `${patternStr} #as ${aliasStr}`;
   }
 
+  private async printKAsAsync(kas: KAs, depth: number = 0): Promise<string> {
+    const patternStr = await this.printKInnerAsync(kas.pattern, depth + 1);
+    const aliasStr = await this.printKInnerAsync(kas.alias, depth + 1);
+    return `${patternStr} #as ${aliasStr}`;
+  }
+
   private printKRewrite(krewrite: KRewrite): string {
     const lhsStr = this.printKInner(krewrite.lhs);
     const rhsStr = this.printKInner(krewrite.rhs);
+    return `( ${lhsStr} => ${rhsStr} )`;
+  }
+
+  private async printKRewriteAsync(
+    krewrite: KRewrite,
+    depth: number = 0
+  ): Promise<string> {
+    const lhsStr = await this.printKInnerAsync(krewrite.lhs, depth + 1);
+    const rhsStr = await this.printKInnerAsync(krewrite.rhs, depth + 1);
     return `( ${lhsStr} => ${rhsStr} )`;
   }
 
@@ -254,6 +632,44 @@ export class PrettyPrinter {
       return `${unparsedKSeq}\n${this.printKInner(lastItem)}`;
     } else {
       return `${unparsedKSeq}\n~> ${this.printKInner(lastItem!)}`;
+    }
+  }
+
+  private async printKSequenceAsync(
+    ksequence: KSequence,
+    depth: number = 0
+  ): Promise<string> {
+    if (ksequence.arity === 0) {
+      return ".K";
+    }
+    if (ksequence.arity === 1) {
+      const firstItemStr = await this.printKInnerAsync(
+        ksequence.items[0]!,
+        depth + 1
+      );
+      return `${firstItemStr} ~> .K`;
+    }
+
+    const items = ksequence.items;
+    const unparsedItems: string[] = [];
+
+    // Process items asynchronously
+    for (let i = 0; i < items.length - 1; i++) {
+      unparsedItems.push(await this.printKInnerAsync(items[i]!, depth + 1));
+    }
+    const unparsedKSeq = unparsedItems.join("\n~> ");
+
+    const lastItem = items[items.length - 1]!;
+    const lastItemStr = await this.printKInnerAsync(lastItem, depth + 1);
+
+    if (
+      lastItem instanceof KToken &&
+      lastItem.token === "..." &&
+      lastItem.sort.name === "K"
+    ) {
+      return `${unparsedKSeq}\n${lastItemStr}`;
+    } else {
+      return `${unparsedKSeq}\n~> ${lastItemStr}`;
     }
   }
 

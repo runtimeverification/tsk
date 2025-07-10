@@ -55,5 +55,8 @@
     "lint": "tsc --noEmit",
     "dev": "bun run --watch src/index.ts"
   },
-  "types": "dist/types/index.d.ts"
+  "types": "dist/types/index.d.ts",
+  "dependencies": {
+    "fast-equals": "^5.2.2"
+  }
 }

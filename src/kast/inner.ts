@@ -1,4 +1,3 @@
-import equal from "fast-deep-equal";
 import { KAst } from "./kast";
 
 export class KSort extends KAst {
@@ -26,6 +25,11 @@ export class KSort extends KAst {
   public let(name?: string | null): KSort {
     const name_ = name ?? this.name;
     return new KSort(name_);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSort = other as KSort;
+    return this.name === otherSort.name;
   }
 }
 
@@ -78,6 +82,22 @@ export class KLabel extends KAst {
 
   public apply(...args: KInner[]): KApply {
     return new KApply(this, args);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherLabel = other as KLabel;
+    if (this.name !== otherLabel.name) {
+      return false;
+    }
+    if (this.params.length !== otherLabel.params.length) {
+      return false;
+    }
+    for (let i = 0; i < this.params.length; i++) {
+      if (!this.params[i]!.equals(otherLabel.params[i]!)) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -258,6 +278,11 @@ export class KToken extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherToken = other as KToken;
+    return this.token === otherToken.token && this.sort.equals(otherToken.sort);
+  }
 }
 
 export class KVariable extends KInner {
@@ -316,6 +341,21 @@ export class KVariable extends KInner {
 
   public match(term: KInner): Subst {
     return new Subst({ [this.name]: term });
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherVar = other as KVariable;
+    if (this.name !== otherVar.name) {
+      return false;
+    }
+    // Handle null comparison
+    if (this.sort === null && otherVar.sort === null) {
+      return true;
+    }
+    if (this.sort === null || otherVar.sort === null) {
+      return false;
+    }
+    return this.sort.equals(otherVar.sort);
   }
 }
 
@@ -391,6 +431,22 @@ export class KApply extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherApply = other as KApply;
+    if (!this.label.equals(otherApply.label)) {
+      return false;
+    }
+    if (this.args.length !== otherApply.args.length) {
+      return false;
+    }
+    for (let i = 0; i < this.args.length; i++) {
+      if (!this.args[i]!.equals(otherApply.args[i]!)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export class KAs extends KInner {
@@ -434,6 +490,13 @@ export class KAs extends KInner {
 
   public match(term: KInner): Subst | null {
     throw new Error("KAs does not support pattern matching");
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherAs = other as KAs;
+    return (
+      this.pattern.equals(otherAs.pattern) && this.alias.equals(otherAs.alias)
+    );
   }
 }
 
@@ -516,6 +579,13 @@ export class KRewrite extends KInner {
      * Similar to apply but using exact syntactic matching instead of pattern matching.
      */
     return bottomUp((t: KInner) => this.replaceTop(t), term);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherRewrite = other as KRewrite;
+    return (
+      this.lhs.equals(otherRewrite.lhs) && this.rhs.equals(otherRewrite.rhs)
+    );
   }
 }
 
@@ -620,6 +690,19 @@ export class KSequence extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSeq = other as KSequence;
+    if (this.items.length !== otherSeq.items.length) {
+      return false;
+    }
+    for (let i = 0; i < this.items.length; i++) {
+      if (!this.items[i]!.equals(otherSeq.items[i]!)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export class Subst {
@@ -719,8 +802,8 @@ export class Subst {
       );
     }
 
-    // For other types, use structural equality
-    return equal(t1.toDict(), t2.toDict());
+    // For other types, use the new fieldEquals method
+    return t1.equals(t2);
   }
 
   public unapply(term: KInner): KInner {

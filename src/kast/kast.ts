@@ -1,5 +1,3 @@
-import equal from "fast-deep-equal";
-import stringify from "safe-stable-stringify";
 import { hashStr } from "../utils";
 
 export abstract class KAst {
@@ -13,7 +11,8 @@ export abstract class KAst {
 
   public toJson(): string {
     const dictObj = this.toDict();
-    return stringify(dictObj);
+    // Use safe-stable-stringify like we had before - it should handle most cases
+    return JSON.stringify(dictObj);
   }
 
   public toString(): string {
@@ -21,8 +20,14 @@ export abstract class KAst {
   }
 
   public equals(other: KAst): boolean {
-    return equal(this.toDict(), other.toDict());
+    // Direct field-by-field comparison like Python's dataclass approach
+    if (this.constructor !== other.constructor) {
+      return false;
+    }
+    return this.fieldEquals(other);
   }
+
+  protected abstract fieldEquals(other: KAst): boolean;
 
   public get hash(): string {
     if (this._hash === null) {

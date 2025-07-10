@@ -51,6 +51,20 @@ export class CTermShow {
   }
 
   /**
+   * Asynchronously split the printed representation of a KInner into lines.
+   * This prevents stack overflow when the printer function deals with deeply nested structures.
+   *
+   * @param kast - The KInner term to print.
+   * @returns A promise that resolves to an array of strings representing the lines of output.
+   */
+  public async printLinesAsync(kast: KInner): Promise<string[]> {
+    // Yield control before calling the printer to prevent stack overflow
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const printed = this._printer(kast);
+    return printed.split("\n");
+  }
+
+  /**
    * Create a new CTermShow instance with modified settings.
    *
    * @param options - Options to override from the current instance.
@@ -137,8 +151,8 @@ export class CTermShow {
 
     if (this._breakCellCollections) {
       workingCterm = new CTerm(
-        await this._topDownAsync(
-          (kast) => this._breakCellsVisitor(kast),
+        await this._topDownAsyncVisitor(
+          (kast) => this._breakCellsVisitorAsync(kast),
           cterm.config,
           0,
           yieldFrequency
@@ -166,7 +180,7 @@ export class CTermShow {
       );
     }
 
-    return this.printLines(workingCterm.config);
+    return await this.printLinesAsync(workingCterm.config);
   }
 
   /**
@@ -211,6 +225,45 @@ export class CTermShow {
       const items = flattenLabel(kast.args[0].label.name, kast.args[0]);
       const printed = new KToken(
         items.map((item) => this._printer(item)).join("\n"),
+        new KSort(kast.label.name.slice(1, -1)) // Remove < and > from cell name
+      );
+      return new KApply(kast.label, [printed]);
+    }
+    return kast;
+  }
+
+  /**
+   * Async visitor function that breaks down cell collections for better readability.
+   * This prevents stack overflow when processing large collections.
+   *
+   * @param kast - The KInner term to potentially transform.
+   * @returns A promise that resolves to the transformed term or the original term if no transformation is needed.
+   */
+  private async _breakCellsVisitorAsync(kast: KInner): Promise<KInner> {
+    if (
+      kast instanceof KApply &&
+      kast.isCell &&
+      kast.args.length === 1 &&
+      kast.args[0] instanceof KApply &&
+      ["_Set_", "_List_", "_Map_"].includes(kast.args[0].label.name)
+    ) {
+      const items = flattenLabel(kast.args[0].label.name, kast.args[0]);
+
+      // Process items asynchronously to prevent stack overflow
+      const printedItems: string[] = [];
+      for (let i = 0; i < items.length; i++) {
+        // Yield control periodically
+        if (i % 10 === 0 && i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        const item = items[i];
+        if (item) {
+          printedItems.push(this._printer(item));
+        }
+      }
+
+      const printed = new KToken(
+        printedItems.join("\n"),
         new KSort(kast.label.name.slice(1, -1)) // Remove < and > from cell name
       );
       return new KApply(kast.label, [printed]);
@@ -265,6 +318,43 @@ export class CTermShow {
     const transformedChildren = await Promise.all(
       transformedTerm.terms.map((childTerm) =>
         this._topDownAsync(f, childTerm, depth + 1, yieldFrequency)
+      )
+    );
+
+    return transformedTerm.letTerms(transformedChildren);
+  }
+
+  /**
+   * Asynchronous version of topDown traversal with async visitor function.
+   * This version supports visitor functions that return promises.
+   *
+   * @param f - The async transformation function to apply to each node.
+   * @param term - The term to traverse.
+   * @param depth - Current recursion depth.
+   * @param yieldFrequency - How often to yield control.
+   * @returns A promise that resolves to the transformed term.
+   */
+  private async _topDownAsyncVisitor(
+    f: (term: KInner) => Promise<KInner>,
+    term: KInner,
+    depth: number = 0,
+    yieldFrequency: number = 10
+  ): Promise<KInner> {
+    // Every yieldFrequency levels, yield control to prevent stack overflow
+    if (depth % yieldFrequency === 0 && depth > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    const transformedTerm = await f(term);
+
+    if (transformedTerm.terms.length === 0) {
+      return transformedTerm;
+    }
+
+    // Process all child terms asynchronously
+    const transformedChildren = await Promise.all(
+      transformedTerm.terms.map((childTerm) =>
+        this._topDownAsyncVisitor(f, childTerm, depth + 1, yieldFrequency)
       )
     );
 

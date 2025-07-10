@@ -238,6 +238,7 @@ export function mlPredToBool(kast: KInner, unsafe: boolean = false): KInner {
           console.warn(
             `Converting #Ceil condition to variable ${ceilVar.name}: ${k}`
           );
+
           return ceilVar;
         }
         if (k.label.name === "#Exists") {
@@ -899,31 +900,9 @@ export async function undoAliasesAsync(
   kast: KInner,
   yieldFrequency: number = 100
 ): Promise<KInner> {
-  console.log("undoAliasesAsync: Starting, checking alias rules...");
-  console.log(
-    "undoAliasesAsync: Total alias rules:",
-    definition.aliasRules.length
-  );
-
-  // Add a safety limit to prevent processing too many aliases
-  const maxAliases = 100;
-  if (definition.aliasRules.length > maxAliases) {
-    console.warn(
-      `undoAliasesAsync: Too many alias rules (${definition.aliasRules.length}), limiting to ${maxAliases}`
-    );
-  }
-
   const aliases: KRewrite[] = [];
-  const aliasRulesToProcess = definition.aliasRules.slice(0, maxAliases);
 
-  for (let i = 0; i < aliasRulesToProcess.length; i++) {
-    const rule = aliasRulesToProcess[i]!;
-    console.log(
-      `undoAliasesAsync: Processing alias rule ${i + 1}/${
-        aliasRulesToProcess.length
-      }`
-    );
-
+  for (const rule of definition.aliasRules) {
     const rewrite = rule.body;
     if (!(rewrite instanceof KRewrite)) {
       throw new Error(`Expected KRewrite as alias body, found: ${rewrite}`);
@@ -941,12 +920,7 @@ export async function undoAliasesAsync(
     aliases.push(new KRewrite(rewrite.rhs, rewrite.lhs));
   }
 
-  console.log(
-    `undoAliasesAsync: Built ${aliases.length} aliases, calling indexedRewriteAsync...`
-  );
-  const result = await indexedRewriteAsync(kast, aliases, yieldFrequency);
-  console.log("undoAliasesAsync: Finished");
-  return result;
+  return await indexedRewriteAsync(kast, aliases, yieldFrequency);
 }
 
 export function renameGeneratedVars(term: KInner): KInner {

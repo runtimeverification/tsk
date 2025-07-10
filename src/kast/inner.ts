@@ -1,3 +1,4 @@
+import equal from "fast-deep-equal";
 import { KAst } from "./kast";
 
 export class KSort extends KAst {
@@ -719,7 +720,7 @@ export class Subst {
     }
 
     // For other types, use structural equality
-    return JSON.stringify(t1.toDict()) === JSON.stringify(t2.toDict());
+    return equal(t1.toDict(), t2.toDict());
   }
 
   public unapply(term: KInner): KInner {
@@ -878,7 +879,6 @@ export async function bottomUpAsync(
   kinner: KInner,
   yieldFrequency: number = 100
 ): Promise<KInner> {
-  console.log("bottomUpAsync: Starting");
   const stack: any[] = [kinner, []];
   let operations = 0;
 
@@ -888,15 +888,6 @@ export async function bottomUpAsync(
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     operations++;
-
-    if (operations % 1000 === 0) {
-      console.log(
-        "bottomUpAsync: Processed",
-        operations,
-        "operations, stack size:",
-        stack.length
-      );
-    }
 
     const terms = stack[stack.length - 1];
     const term = stack[stack.length - 2];
@@ -908,7 +899,6 @@ export async function bottomUpAsync(
       stack.pop();
       const transformedTerm = f(term.letTerms(terms));
       if (!stack || stack.length === 0) {
-        console.log("bottomUpAsync: Finished after", operations, "operations");
         return transformedTerm;
       }
       stack[stack.length - 1].push(transformedTerm);
@@ -916,15 +906,6 @@ export async function bottomUpAsync(
       // Process the next child
       stack.push(term.terms[idx]);
       stack.push([]);
-    }
-
-    // Safety check for runaway operations
-    if (operations > 100000) {
-      console.error(
-        "bottomUpAsync: Too many operations, breaking to prevent infinite loop"
-      );
-      console.error("bottomUpAsync: Final stack size:", stack.length);
-      throw new Error("bottomUpAsync exceeded maximum operations");
     }
   }
 }

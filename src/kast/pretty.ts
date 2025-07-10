@@ -82,8 +82,6 @@ export class PrettyPrinter {
   }
 
   print(kast: KAst): string {
-    // console.debug(`Unparsing: ${kast}`);
-
     if (kast instanceof KAtt) {
       return this.printKAtt(kast);
     }
@@ -298,19 +296,6 @@ export class PrettyPrinter {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
-    if (depth === 0) {
-      console.log("printKInnerAsync: Starting at depth 0");
-    }
-
-    if (depth % 100 === 0 && depth > 0) {
-      console.log(
-        "printKInnerAsync: Reached depth",
-        depth,
-        "node type:",
-        kast.constructor.name
-      );
-    }
-
     if (kast instanceof KVariable) {
       return this.printKVariable(kast);
     }
@@ -318,23 +303,15 @@ export class PrettyPrinter {
       return this.printKToken(kast);
     }
     if (kast instanceof KApply) {
-      if (depth === 0)
-        console.log("printKInnerAsync: Processing KApply at depth 0");
       return await this.printKApplyAsync(kast, depth + 1);
     }
     if (kast instanceof KAs) {
-      if (depth === 0)
-        console.log("printKInnerAsync: Processing KAs at depth 0");
       return await this.printKAsAsync(kast, depth + 1);
     }
     if (kast instanceof KRewrite) {
-      if (depth === 0)
-        console.log("printKInnerAsync: Processing KRewrite at depth 0");
       return await this.printKRewriteAsync(kast, depth + 1);
     }
     if (kast instanceof KSequence) {
-      if (depth === 0)
-        console.log("printKInnerAsync: Processing KSequence at depth 0");
       return await this.printKSequenceAsync(kast, depth + 1);
     }
 
@@ -522,38 +499,9 @@ export class PrettyPrinter {
     const label = kapply.label.name;
     const args = kapply.args;
 
-    if (depth === 0) {
-      console.log(
-        "printKApplyAsync: Starting at depth 0, label:",
-        label,
-        "args count:",
-        args.length
-      );
-    }
-
-    if (depth % 50 === 0 && depth > 0) {
-      console.log(
-        "printKApplyAsync: Depth",
-        depth,
-        "label:",
-        label,
-        "args:",
-        args.length
-      );
-    }
-
     // Process args asynchronously to prevent stack overflow
     const unparsedArgs: string[] = [];
     for (let i = 0; i < args.length; i++) {
-      if (depth === 0 && i % 10 === 0) {
-        console.log(
-          "printKApplyAsync: Processing arg",
-          i + 1,
-          "of",
-          args.length
-        );
-      }
-
       // Yield more frequently when processing arguments
       if (
         i % Math.max(1, Math.floor(this._yieldFrequency / 2)) === 0 &&
@@ -562,10 +510,6 @@ export class PrettyPrinter {
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
       unparsedArgs.push(await this.printKInnerAsync(args[i]!, depth + 1));
-    }
-
-    if (depth === 0) {
-      console.log("printKApplyAsync: Finished processing all args at depth 0");
     }
 
     if (kapply.isCell) {

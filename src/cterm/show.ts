@@ -71,23 +71,16 @@ export class CTermShow {
    */
   public async printLinesAsync(kast: KInner): Promise<string[]> {
     // Yield control before calling the printer to prevent stack overflow
-    console.log("printLinesAsync: Starting, about to yield control");
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     let printed: string;
     if (this._asyncPrinter) {
-      console.log("printLinesAsync: Using async printer");
       printed = await this._asyncPrinter(kast);
-      console.log("printLinesAsync: Async printer completed");
     } else {
-      console.log("printLinesAsync: Using sync printer");
       printed = this._printer(kast);
-      console.log("printLinesAsync: Sync printer completed");
     }
 
-    console.log("printLinesAsync: About to split lines");
     const result = printed.split("\n");
-    console.log("printLinesAsync: Finished, returning", result.length, "lines");
     return result;
   }
 
@@ -172,11 +165,9 @@ export class CTermShow {
    * @returns A promise that resolves to an array of strings representing the formatted configuration.
    */
   public async showConfigAsync(cterm: CTerm): Promise<string[]> {
-    console.log("showConfigAsync: Starting");
     let workingCterm = cterm;
 
     if (this._breakCellCollections) {
-      console.log("showConfigAsync: About to break cell collections");
       workingCterm = new CTerm(
         await this._topDownAsyncVisitor(
           (kast) => this._breakCellsVisitorAsync(kast),
@@ -184,13 +175,9 @@ export class CTermShow {
         ),
         cterm.constraints
       );
-      console.log("showConfigAsync: Finished breaking cell collections");
-    } else {
-      console.log("showConfigAsync: Skipping cell collection breaking");
     }
 
     if (this._omitLabels.length > 0) {
-      console.log("showConfigAsync: About to omit labels");
       workingCterm = new CTerm(
         await this._topDownAsync(
           (kast) => this._omitLabelsVisitor(kast),
@@ -198,25 +185,16 @@ export class CTermShow {
         ),
         workingCterm.constraints
       );
-      console.log("showConfigAsync: Finished omitting labels");
-    } else {
-      console.log("showConfigAsync: Skipping label omission");
     }
 
     if (this._minimize) {
-      console.log("showConfigAsync: About to minimize term");
       workingCterm = new CTerm(
         minimizeTerm(workingCterm.config, freeVars(workingCterm.constraint)),
         workingCterm.constraints
       );
-      console.log("showConfigAsync: Finished minimizing term");
-    } else {
-      console.log("showConfigAsync: Skipping term minimization");
     }
 
-    console.log("showConfigAsync: About to call printLinesAsync");
     const result = await this.printLinesAsync(workingCterm.config);
-    console.log("showConfigAsync: Finished printLinesAsync");
     return result;
   }
 

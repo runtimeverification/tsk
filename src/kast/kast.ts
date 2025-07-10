@@ -1,4 +1,5 @@
-import { deepEqual } from "fast-equals";
+import equal from "fast-deep-equal";
+import stringify from "safe-stable-stringify";
 import { hashStr } from "../utils";
 
 export abstract class KAst {
@@ -12,16 +13,15 @@ export abstract class KAst {
 
   public toJson(): string {
     const dictObj = this.toDict();
-    return JSON.stringify(dictObj);
+    return stringify(dictObj);
   }
 
   public toString(): string {
-    return JSON.stringify(this.toJson());
+    return this.toJson();
   }
 
   public equals(other: KAst): boolean {
-    // Use fast-equals library to avoid stack overflow
-    return deepEqual(this, other);
+    return equal(this.toDict(), other.toDict());
   }
 
   public get hash(): string {

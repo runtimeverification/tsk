@@ -1,3 +1,4 @@
+import equal from "fast-deep-equal";
 import * as fs from "fs";
 import type { FrozenRecord } from "../utils";
 import { frozenRecord, notNone, single } from "../utils";
@@ -1410,6 +1411,7 @@ export class KDefinition
         module.sentenceByUniqueId
       )) {
         if (uniqueId in uniqueIdMap && sent !== uniqueIdMap[uniqueId]) {
+          // Duplicate UNIQUE_ID found - silently skip
           console.debug(
             `Same UNIQUE_ID found for two different sentences: ${[
               sent,
@@ -1636,10 +1638,7 @@ export class KDefinition
         const otherNoSource = other.let({
           att: other.att.dropSource?.() || other.att,
         });
-        if (
-          JSON.stringify(thisNoSource.toDict()) !==
-          JSON.stringify(otherNoSource.toDict())
-        ) {
+        if (!equal(thisNoSource.toDict(), otherNoSource.toDict())) {
           throw new Error(
             `Found multiple productions for ${symbol}: ${[other, prod]}`
           );
@@ -1805,6 +1804,7 @@ export class KDefinition
                 asort,
               ]}`
             );
+
             return k;
           }
           if (prod.params.includes(psort)) {
@@ -1817,6 +1817,7 @@ export class KDefinition
                   asort,
                 ]}`
               );
+
               return k;
             } else if (!(psort.name in sortDict)) {
               sortDict[psort.name] = asort;
@@ -2039,9 +2040,7 @@ export function readKastDefinition(path: string): KDefinition {
   /**
    * Read a KDefinition from disk, failing if it's not actually a KDefinition.
    */
-  console.info(`Loading JSON definition: ${path}`);
   const jsonDefn = JSON.parse(fs.readFileSync(path, "utf8"));
-  console.info(`Converting JSON definition to Kast: ${path}`);
   const kastDefn = kastTerm(jsonDefn);
   return KDefinition.fromDict(kastDefn);
 }

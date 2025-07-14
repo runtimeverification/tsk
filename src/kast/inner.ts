@@ -15,22 +15,14 @@ export class KSort extends KAst {
     return new KSort(d.name);
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     return {
       node: "KSort",
       name: this.name,
     };
   }
 
-  public async toDictAsync(
-    depth: number = 0,
-    yieldFrequency: number = 10
-  ): Promise<Record<string, any>> {
-    return {
-      node: "KSort",
-      name: this.name,
-    };
-  }
+
 
   public let(name?: string | null): KSort {
     const name_ = name ?? this.name;
@@ -74,37 +66,15 @@ export class KLabel extends KAst {
     );
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     return {
       node: "KLabel",
       name: this.name,
-      params: this.params.map((param) => param.toDict()),
+      params: this.params.map((param) => param.toDict(useIteration)),
     };
   }
 
-  public async toDictAsync(
-    depth: number = 0,
-    yieldFrequency: number = 10
-  ): Promise<Record<string, any>> {
-    // Process params asynchronously
-    const paramDicts: Record<string, any>[] = [];
-    for (let i = 0; i < this.params.length; i++) {
-      if (i % yieldFrequency === 0 && i > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      const paramDict = await this.params[i]!.toDictAsync(
-        depth + 1,
-        yieldFrequency
-      );
-      paramDicts.push(paramDict);
-    }
 
-    return {
-      node: "KLabel",
-      name: this.name,
-      params: paramDicts,
-    };
-  }
 
   public let(
     options: { name?: string; params?: (string | KSort)[] } = {}
@@ -145,28 +115,14 @@ export abstract class KInner extends KAst {
     "KSequence",
   ]);
 
-  public static fromJson(s: string): KInner {
-    return KInner.fromDict(JSON.parse(s));
+  public static fromJson(s: string, useIteration: boolean = true): KInner {
+    return KInner.fromDict(JSON.parse(s), useIteration);
   }
 
-  public static async fromJsonAsync(
-    s: string,
-    yieldFrequency = 10
-  ): Promise<KInner> {
-    return KInner.fromDictAsync(JSON.parse(s), 0, yieldFrequency);
-  }
 
-  // Async version to break up call stack using Promises
-  public static async fromDictAsync(
-    dct: Record<string, any>,
-    depth = 0,
-    yieldFrequency = 10
-  ): Promise<KInner> {
-    // Every yieldFrequency levels, yield control to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
 
+  private static _fromDictRecursive(dct: Record<string, any>): KInner {
+    // Original recursive implementation for comparison
     const nodeType = dct.node;
     switch (nodeType) {
       case "KToken":
@@ -174,62 +130,188 @@ export abstract class KInner extends KAst {
       case "KVariable":
         return KVariable._fromDict(dct, []);
       case "KApply":
-        const args = await Promise.all(
-          (dct.args || []).map((arg: any) =>
-            KInner.fromDictAsync(arg, depth + 1, yieldFrequency)
-          )
-        );
+        const args = dct.args?.map((arg: any) => KInner._fromDictRecursive(arg)) || [];
         return KApply._fromDict(dct, args);
       case "KSequence":
-        const items = await Promise.all(
-          (dct.items || []).map((item: any) =>
-            KInner.fromDictAsync(item, depth + 1, yieldFrequency)
-          )
-        );
+        const items = dct.items?.map((item: any) => KInner._fromDictRecursive(item)) || [];
         return KSequence._fromDict(dct, items);
       case "KRewrite":
-        const [lhs, rhs] = await Promise.all([
-          KInner.fromDictAsync(dct.lhs, depth + 1, yieldFrequency),
-          KInner.fromDictAsync(dct.rhs, depth + 1, yieldFrequency),
-        ]);
+        const lhs = KInner._fromDictRecursive(dct.lhs);
+        const rhs = KInner._fromDictRecursive(dct.rhs);
         return KRewrite._fromDict(dct, [lhs, rhs]);
       case "KAs":
-        const [pattern, alias] = await Promise.all([
-          KInner.fromDictAsync(dct.pattern, depth + 1, yieldFrequency),
-          KInner.fromDictAsync(dct.alias, depth + 1, yieldFrequency),
-        ]);
+        const pattern = KInner._fromDictRecursive(dct.pattern);
+        const alias = KInner._fromDictRecursive(dct.alias);
         return KAs._fromDict(dct, [pattern, alias]);
       default:
         throw new Error(`Unknown node type: ${nodeType}`);
     }
   }
 
-  public static fromDict(dct: Record<string, any>): KInner {
-    // Simplified implementation - in practice would need full parsing logic
-    const nodeType = dct.node;
-    switch (nodeType) {
-      case "KToken":
-        return KToken._fromDict(dct, []);
-      case "KVariable":
-        return KVariable._fromDict(dct, []);
-      case "KApply":
-        const args = dct.args?.map((arg: any) => KInner.fromDict(arg)) || [];
-        return KApply._fromDict(dct, args);
-      case "KSequence":
-        const items =
-          dct.items?.map((item: any) => KInner.fromDict(item)) || [];
-        return KSequence._fromDict(dct, items);
-      case "KRewrite":
-        const lhs = KInner.fromDict(dct.lhs);
-        const rhs = KInner.fromDict(dct.rhs);
-        return KRewrite._fromDict(dct, [lhs, rhs]);
-      case "KAs":
-        const pattern = KInner.fromDict(dct.pattern);
-        const alias = KInner.fromDict(dct.alias);
-        return KAs._fromDict(dct, [pattern, alias]);
-      default:
-        throw new Error(`Unknown node type: ${nodeType}`);
+  public static fromDict(dct: Record<string, any>, useIteration: boolean = true): KInner {
+    if (!useIteration) {
+      // Original recursive implementation for comparison
+      return KInner._fromDictRecursive(dct);
     }
+    
+    // Use iterative approach to avoid stack overflow on deeply nested structures
+    const stack: { 
+      dct: Record<string, any>; 
+      parent?: { obj: any; key: string | number; };
+    }[] = [];
+    
+    const results = new Map<Record<string, any>, KInner>();
+    
+    // Start with the root dictionary
+    stack.push({ dct });
+    
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      
+      if (results.has(current.dct)) {
+        // Already processed, set in parent if needed
+        if (current.parent) {
+          current.parent.obj[current.parent.key] = results.get(current.dct)!;
+        }
+        continue;
+      }
+      
+      const nodeType = current.dct.node;
+      
+      if (nodeType === "KToken") {
+        const result = KToken._fromDict(current.dct, []);
+        results.set(current.dct, result);
+        if (current.parent) {
+          current.parent.obj[current.parent.key] = result;
+        }
+      } else if (nodeType === "KVariable") {
+        const result = KVariable._fromDict(current.dct, []);
+        results.set(current.dct, result);
+        if (current.parent) {
+          current.parent.obj[current.parent.key] = result;
+        }
+      } else if (nodeType === "KApply") {
+        const args = current.dct.args || [];
+        let allArgsProcessed = true;
+        const processedArgs: KInner[] = [];
+        
+        for (let i = 0; i < args.length; i++) {
+          if (results.has(args[i])) {
+            processedArgs[i] = results.get(args[i])!;
+          } else {
+            allArgsProcessed = false;
+            break;
+          }
+        }
+        
+        if (!allArgsProcessed) {
+          // Push back to stack to process later
+          stack.push(current);
+          // Add unprocessed args to stack
+          for (let i = 0; i < args.length; i++) {
+            if (!results.has(args[i])) {
+              stack.push({ 
+                dct: args[i], 
+                parent: { obj: processedArgs, key: i }
+              });
+            }
+          }
+        } else {
+          // All args processed, create KApply
+          const result = KApply._fromDict(current.dct, processedArgs);
+          results.set(current.dct, result);
+          if (current.parent) {
+            current.parent.obj[current.parent.key] = result;
+          }
+        }
+      } else if (nodeType === "KSequence") {
+        const items = current.dct.items || [];
+        let allItemsProcessed = true;
+        const processedItems: KInner[] = [];
+        
+        for (let i = 0; i < items.length; i++) {
+          if (results.has(items[i])) {
+            processedItems[i] = results.get(items[i])!;
+          } else {
+            allItemsProcessed = false;
+            break;
+          }
+        }
+        
+        if (!allItemsProcessed) {
+          // Push back to stack to process later
+          stack.push(current);
+          // Add unprocessed items to stack
+          for (let i = 0; i < items.length; i++) {
+            if (!results.has(items[i])) {
+              stack.push({ 
+                dct: items[i], 
+                parent: { obj: processedItems, key: i }
+              });
+            }
+          }
+        } else {
+          // All items processed, create KSequence
+          const result = KSequence._fromDict(current.dct, processedItems);
+          results.set(current.dct, result);
+          if (current.parent) {
+            current.parent.obj[current.parent.key] = result;
+          }
+        }
+      } else if (nodeType === "KRewrite") {
+        const lhsProcessed = results.has(current.dct.lhs);
+        const rhsProcessed = results.has(current.dct.rhs);
+        
+        if (!lhsProcessed || !rhsProcessed) {
+          // Push back to stack to process later
+          stack.push(current);
+          // Add unprocessed terms to stack
+          if (!lhsProcessed) {
+            stack.push({ dct: current.dct.lhs });
+          }
+          if (!rhsProcessed) {
+            stack.push({ dct: current.dct.rhs });
+          }
+        } else {
+          // Both terms processed, create KRewrite
+          const lhs = results.get(current.dct.lhs)!;
+          const rhs = results.get(current.dct.rhs)!;
+          const result = KRewrite._fromDict(current.dct, [lhs, rhs]);
+          results.set(current.dct, result);
+          if (current.parent) {
+            current.parent.obj[current.parent.key] = result;
+          }
+        }
+      } else if (nodeType === "KAs") {
+        const patternProcessed = results.has(current.dct.pattern);
+        const aliasProcessed = results.has(current.dct.alias);
+        
+        if (!patternProcessed || !aliasProcessed) {
+          // Push back to stack to process later
+          stack.push(current);
+          // Add unprocessed terms to stack
+          if (!patternProcessed) {
+            stack.push({ dct: current.dct.pattern });
+          }
+          if (!aliasProcessed) {
+            stack.push({ dct: current.dct.alias });
+          }
+        } else {
+          // Both terms processed, create KAs
+          const pattern = results.get(current.dct.pattern)!;
+          const alias = results.get(current.dct.alias)!;
+          const result = KAs._fromDict(current.dct, [pattern, alias]);
+          results.set(current.dct, result);
+          if (current.parent) {
+            current.parent.obj[current.parent.key] = result;
+          }
+        }
+      } else {
+        throw new Error(`Unknown node type: ${nodeType}`);
+      }
+    }
+    
+    return results.get(dct)!;
   }
 
   /*
@@ -242,39 +324,145 @@ export abstract class KInner extends KAst {
   public abstract get terms(): KInner[];
   public abstract letTerms(terms: KInner[]): KInner;
   public abstract match(term: KInner): Subst | null;
-  public abstract _toDict(terms: Record<string, any>[]): Record<string, any>;
+  public abstract _toDict(terms: Record<string, any>[], useIteration?: boolean): Record<string, any>;
 
   public mapInner(f: (term: KInner) => KInner): KInner {
     return this.letTerms(this.terms.map(f));
   }
 
-  public toDict(): Record<string, any> {
-    const termDicts = this.terms.map((term) => term.toDict());
-    return this._toDict(termDicts);
+  private _toDictRecursive(): Record<string, any> {
+    // Original recursive implementation for comparison
+    const termDicts = this.terms.map((term) => term._toDictRecursive());
+    return this._toDict(termDicts, false);
   }
 
-  public async toDictAsync(
-    depth: number = 0,
-    yieldFrequency: number = 10
-  ): Promise<Record<string, any>> {
-    // Yield control periodically to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+  public toDict(useIteration: boolean = true): Record<string, any> {
+    if (!useIteration) {
+      // Original recursive implementation for comparison
+      return this._toDictRecursive();
     }
-
-    // Process all child terms asynchronously
-    const termDicts: Record<string, any>[] = [];
-    for (let i = 0; i < this.terms.length; i++) {
-      const termDict = await this.terms[i]!.toDictAsync(
-        depth + 1,
-        yieldFrequency
-      );
-      termDicts.push(termDict);
+    // Use iterative approach to avoid stack overflow on deeply nested structures
+    const stack: { 
+      item: KAst; 
+      type: 'root' | 'kinnerTerm' | 'label' | 'sort' | 'labelParam';
+      parentContext?: any;
+      parentKey?: string;
+      termIndex?: number;
+    }[] = [];
+    
+    const results = new Map<KAst, Record<string, any>>();
+    
+    // Start with this term
+    stack.push({ item: this, type: 'root' });
+    
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      
+      if (results.has(current.item)) {
+        // Already processed
+        continue;
+      }
+      
+      if (current.item instanceof KInner) {
+        // Check if all dependencies are processed
+        const deps: KAst[] = [...current.item.terms];
+        
+        if (current.item instanceof KApply) {
+          deps.push(current.item.label);
+        }
+        if (current.item instanceof KToken) {
+          deps.push(current.item.sort);
+        }
+        if (current.item instanceof KVariable && current.item.sort) {
+          deps.push(current.item.sort);
+        }
+        
+        const allDepsReady = deps.every(dep => results.has(dep));
+        
+        if (!allDepsReady) {
+          // Push back to stack to process later
+          stack.push(current);
+          
+          // Add dependencies to stack
+          for (const dep of deps) {
+            if (!results.has(dep)) {
+              if (dep instanceof KInner) {
+                stack.push({ item: dep, type: 'kinnerTerm' });
+              } else if (dep instanceof KLabel) {
+                stack.push({ item: dep, type: 'label' });
+              } else if (dep instanceof KSort) {
+                stack.push({ item: dep, type: 'sort' });
+              }
+            }
+          }
+          continue;
+        }
+        
+        // All dependencies ready, build result
+        if (current.item instanceof KApply) {
+          const termDicts = current.item.terms.map(term => results.get(term)!);
+          results.set(current.item, {
+            node: "KApply",
+            label: results.get(current.item.label)!,
+            args: termDicts,
+            arity: current.item.arity,
+            variable: false,
+          });
+        } else if (current.item instanceof KToken) {
+          results.set(current.item, {
+            node: "KToken",
+            token: current.item.token,
+            sort: results.get(current.item.sort)!,
+          });
+        } else if (current.item instanceof KVariable) {
+          const result: Record<string, any> = {
+            node: "KVariable",
+            name: current.item.name,
+          };
+          if (current.item.sort !== null) {
+            result.sort = results.get(current.item.sort)!;
+          }
+          results.set(current.item, result);
+        } else {
+          // For other KInner types, use the existing _toDict method
+          const termDicts = current.item.terms.map(term => results.get(term)!);
+          results.set(current.item, current.item._toDict(termDicts, true));
+        }
+      } else if (current.item instanceof KLabel) {
+        // Check if all params are processed
+        const allParamsReady = current.item.params.every(param => results.has(param));
+        
+        if (!allParamsReady) {
+          // Push back to stack
+          stack.push(current);
+          // Add params to stack
+          for (const param of current.item.params) {
+            if (!results.has(param)) {
+              stack.push({ item: param, type: 'labelParam' });
+            }
+          }
+          continue;
+        }
+        
+        // All params ready
+        results.set(current.item, {
+          node: "KLabel",
+          name: current.item.name,
+          params: current.item.params.map(param => results.get(param)!),
+        });
+      } else if (current.item instanceof KSort) {
+        // KSort is simple, no dependencies
+        results.set(current.item, {
+          node: "KSort",
+          name: current.item.name,
+        });
+      }
     }
-
-    // Use the sync _toDict method - no need for async version
-    return this._toDict(termDicts);
+    
+    return results.get(this)!;
   }
+
+
 
   protected static combineMatches(substs: (Subst | null)[]): Subst | null {
     let result: Subst | null = new Subst();
@@ -307,11 +495,11 @@ export class KToken extends KInner {
     return new KToken(dct.token, KSort.fromDict(dct.sort));
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KToken",
       token: this.token,
-      sort: this.sort.toDict(),
+      sort: this.sort.toDict(useIteration),
     };
   }
 
@@ -365,13 +553,13 @@ export class KVariable extends KInner {
     return new KVariable(dct.name, sort);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const result: Record<string, any> = {
       node: "KVariable",
       name: this.name,
     };
     if (this.sort !== null) {
-      result.sort = this.sort.toDict();
+      result.sort = this.sort.toDict(useIteration);
     }
     return result;
   }
@@ -451,10 +639,10 @@ export class KApply extends KInner {
     return new KApply(KLabel.fromDict(dct.label), terms);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KApply",
-      label: this.label.toDict(),
+      label: this.label.toDict(useIteration),
       args: terms,
       arity: this.arity,
       variable: false,
@@ -521,7 +709,7 @@ export class KAs extends KInner {
     return new KAs(pattern!, alias!);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const [pattern, alias] = terms;
     return {
       node: "KAs",
@@ -572,7 +760,7 @@ export class KRewrite extends KInner {
     return new KRewrite(lhs!, rhs!);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const [lhs, rhs] = terms;
     return {
       node: "KRewrite",
@@ -683,7 +871,7 @@ export class KSequence extends KInner {
     return new KSequence(terms);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KSequence",
       items: terms,
@@ -797,18 +985,18 @@ export class Subst {
     return Object.keys(this._subst).length;
   }
 
-  public static fromDict(d: Record<string, any>): Subst {
+  public static fromDict(d: Record<string, any>, useIteration: boolean = true): Subst {
     const entries: Record<string, KInner> = {};
     for (const [k, v] of Object.entries(d)) {
-      entries[k] = KInner.fromDict(v);
+      entries[k] = KInner.fromDict(v, useIteration);
     }
     return new Subst(entries);
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     const result: Record<string, any> = {};
     for (const [k, v] of this.entries()) {
-      result[k] = v.toDict();
+      result[k] = v.toDict(useIteration);
     }
     return result;
   }

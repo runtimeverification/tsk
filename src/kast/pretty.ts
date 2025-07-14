@@ -319,126 +319,187 @@ export class PrettyPrinter {
   }
 
   /**
-   * Iterative version of printKInnerAsync that uses explicit stacks to avoid recursion
+   * Safe iterative async version that completely avoids recursion and uses async toDict
    */
-  private async printKInnerIterative(kast: KInner): Promise<string> {
+  public async printKInnerSafeAsync(kast: KInner): Promise<string> {
+    // Use async toDict to convert to plain object first, which is safe from stack overflow
+    const kastDict = await kast.toDictAsync(0, this._yieldFrequency);
+
+    // Then reconstruct using fromDict and print iteratively
+    const reconstructed = KInner.fromDict(kastDict);
+    return this.printKInnerIteratively(reconstructed);
+  }
+
+  /**
+   * Iterative version of printKInner that uses explicit stacks to avoid recursion
+   */
+  public printKInnerIteratively(kast: KInner): string {
     type StackItem = {
       node: KInner;
       type: "process" | "combine";
-      result?: string;
-      args?: string[];
-      argIndex?: number;
+      childrenNeeded?: number;
+      nodeType?: "KAs" | "KRewrite" | "KSequence" | "KApply";
     };
 
     const stack: StackItem[] = [{ node: kast, type: "process" }];
-    const results: string[] = [];
-    let operations = 0;
+    const resultStack: string[] = [];
 
     while (stack.length > 0) {
-      // Yield control periodically
-      if (operations % this._yieldFrequency === 0 && operations > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      operations++;
-
       const item = stack.pop()!;
 
       if (item.type === "combine") {
-        // We're combining results from child nodes
-        if (item.node instanceof KApply) {
-          const label = item.node.label.name;
-          const args = item.args!;
+        // Collect the required number of children from resultStack
+        const node = item.node;
+        const childrenNeeded = item.childrenNeeded || 0;
+        const children: string[] = [];
 
-          if (item.node.isCell) {
-            const cellContents = args.join("\n").trimEnd();
-            const cellStr = `${label}\n${indent(cellContents)}\n</${label.slice(
+        // Pop the children results from the result stack
+        for (let i = 0; i < childrenNeeded; i++) {
+          const child = resultStack.pop();
+          if (child !== undefined) {
+            children.unshift(child); // Reverse order since we're popping
+          }
+        }
+
+        let result: string;
+        if (item.nodeType === "KApply") {
+          const kapply = node as KApply;
+          const label = kapply.label.name;
+          const unparsedArgs = children;
+
+          if (kapply.isCell) {
+            const cellContents = unparsedArgs.join("\n").trimEnd();
+            result = `${label}\n${indent(cellContents)}\n</${label.slice(
               1
-            )}`;
-            results.push(cellStr.trimEnd());
+            )}`.trimEnd();
           } else {
             const unparser =
               label in this.symbolTable
                 ? this.symbolTable[label]
                 : this.appliedLabelStr(label);
-            results.push(unparser!(...args));
+            result = unparser!(...unparsedArgs);
           }
-        } else if (item.node instanceof KAs) {
-          const [patternStr, aliasStr] = item.args!;
-          results.push(`${patternStr} #as ${aliasStr}`);
-        } else if (item.node instanceof KRewrite) {
-          const [lhsStr, rhsStr] = item.args!;
-          results.push(`( ${lhsStr} => ${rhsStr} )`);
-        } else if (item.node instanceof KSequence) {
-          const args = item.args!;
-          if (args.length === 0) {
-            results.push(".K");
-          } else if (args.length === 1) {
-            results.push(`${args[0]} ~> .K`);
+        } else if (item.nodeType === "KAs") {
+          const [patternStr, aliasStr] = children;
+          result = `${patternStr} #as ${aliasStr}`;
+        } else if (item.nodeType === "KRewrite") {
+          const [lhsStr, rhsStr] = children;
+          result = `( ${lhsStr} => ${rhsStr} )`;
+        } else if (item.nodeType === "KSequence") {
+          const ksequence = node as KSequence;
+          if (ksequence.arity === 0) {
+            result = ".K";
+          } else if (ksequence.arity === 1) {
+            result = `${children[0]} ~> .K`;
           } else {
-            const items = args.slice(0, -1).join("\n~> ");
-            const lastItem = args[args.length - 1]!;
-            const lastNode = item.node.items[item.node.items.length - 1]!;
+            const unparsedKSeq = children.slice(0, -1).join("\n~> ");
+            const lastItem = ksequence.items[ksequence.items.length - 1];
             if (
-              lastNode instanceof KToken &&
-              lastNode.token === "..." &&
-              lastNode.sort.name === "K"
+              lastItem instanceof KToken &&
+              lastItem.token === "..." &&
+              lastItem.sort.name === "K"
             ) {
-              results.push(`${items}\n${lastItem}`);
+              result = `${unparsedKSeq}\n${children[children.length - 1]}`;
             } else {
-              results.push(`${items}\n~> ${lastItem}`);
+              result = `${unparsedKSeq}\n~> ${children[children.length - 1]}`;
             }
           }
+        } else {
+          // Fallback - just join children
+          result = children.join(" ");
         }
+
+        resultStack.push(result);
         continue;
       }
 
-      // Processing a node
+      // Process a node
       const node = item.node;
 
       if (node instanceof KVariable) {
-        results.push(this.printKVariable(node));
+        resultStack.push(this.printKVariable(node));
       } else if (node instanceof KToken) {
-        results.push(this.printKToken(node));
+        resultStack.push(this.printKToken(node));
       } else if (node instanceof KApply) {
-        // Push a combine item first (will be processed after children)
-        stack.push({
-          node: node,
-          type: "combine",
-          args: new Array(node.args.length),
-        });
-
-        // Push child processing items (in reverse order so they're processed left-to-right)
-        for (let i = node.args.length - 1; i >= 0; i--) {
-          stack.push({ node: node.args[i]!, type: "process" });
-        }
-      } else if (node instanceof KAs) {
-        stack.push({
-          node: node,
-          type: "combine",
-          args: new Array(2),
-        });
-        stack.push({ node: node.alias, type: "process" });
-        stack.push({ node: node.pattern, type: "process" });
-      } else if (node instanceof KRewrite) {
-        stack.push({
-          node: node,
-          type: "combine",
-          args: new Array(2),
-        });
-        stack.push({ node: node.rhs, type: "process" });
-        stack.push({ node: node.lhs, type: "process" });
-      } else if (node instanceof KSequence) {
-        if (node.arity === 0) {
-          results.push(".K");
+        if (node.args.length === 0) {
+          // No children to process, can print directly
+          const label = node.label.name;
+          const unparser =
+            label in this.symbolTable
+              ? this.symbolTable[label]
+              : this.appliedLabelStr(label);
+          resultStack.push(unparser!());
         } else {
+          // Push combine operation first (will be processed after children)
           stack.push({
-            node: node,
+            node,
             type: "combine",
-            args: new Array(node.items.length),
+            childrenNeeded: node.args.length,
+            nodeType: "KApply",
           });
 
+          // Push children in reverse order (stack is LIFO)
+          for (let i = node.args.length - 1; i >= 0; i--) {
+            stack.push({
+              node: node.args[i]!,
+              type: "process",
+            });
+          }
+        }
+      } else if (node instanceof KAs) {
+        // Handle KAs iteratively
+        stack.push({
+          node,
+          type: "combine",
+          childrenNeeded: 2,
+          nodeType: "KAs",
+        });
+
+        // Push alias first, then pattern (reverse order for stack)
+        stack.push({
+          node: node.alias,
+          type: "process",
+        });
+        stack.push({
+          node: node.pattern,
+          type: "process",
+        });
+      } else if (node instanceof KRewrite) {
+        // Handle KRewrite iteratively
+        stack.push({
+          node,
+          type: "combine",
+          childrenNeeded: 2,
+          nodeType: "KRewrite",
+        });
+
+        // Push rhs first, then lhs (reverse order for stack)
+        stack.push({
+          node: node.rhs,
+          type: "process",
+        });
+        stack.push({
+          node: node.lhs,
+          type: "process",
+        });
+      } else if (node instanceof KSequence) {
+        // Handle KSequence iteratively
+        if (node.arity === 0) {
+          resultStack.push(".K");
+        } else {
+          stack.push({
+            node,
+            type: "combine",
+            childrenNeeded: node.items.length,
+            nodeType: "KSequence",
+          });
+
+          // Push items in reverse order (stack is LIFO)
           for (let i = node.items.length - 1; i >= 0; i--) {
-            stack.push({ node: node.items[i]!, type: "process" });
+            stack.push({
+              node: node.items[i]!,
+              type: "process",
+            });
           }
         }
       } else {
@@ -446,7 +507,7 @@ export class PrettyPrinter {
       }
     }
 
-    return results[results.length - 1] || "";
+    return resultStack.pop() || "";
   }
 
   private printKSort(ksort: KSort): string {

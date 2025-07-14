@@ -243,11 +243,6 @@ export abstract class KInner extends KAst {
   public abstract letTerms(terms: KInner[]): KInner;
   public abstract match(term: KInner): Subst | null;
   public abstract _toDict(terms: Record<string, any>[]): Record<string, any>;
-  public abstract _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>>;
 
   public mapInner(f: (term: KInner) => KInner): KInner {
     return this.letTerms(this.terms.map(f));
@@ -277,7 +272,8 @@ export abstract class KInner extends KAst {
       termDicts.push(termDict);
     }
 
-    return this._toDictAsync(termDicts, depth, yieldFrequency);
+    // Use the sync _toDict method - no need for async version
+    return this._toDict(termDicts);
   }
 
   protected static combineMatches(substs: (Subst | null)[]): Subst | null {
@@ -316,18 +312,6 @@ export class KToken extends KInner {
       node: "KToken",
       token: this.token,
       sort: this.sort.toDict(),
-    };
-  }
-
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
-    return {
-      node: "KToken",
-      token: this.token,
-      sort: this.sort.toDict(), // KSort.toDict() is not recursive, so it's safe
     };
   }
 
@@ -388,21 +372,6 @@ export class KVariable extends KInner {
     };
     if (this.sort !== null) {
       result.sort = this.sort.toDict();
-    }
-    return result;
-  }
-
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
-    const result: Record<string, any> = {
-      node: "KVariable",
-      name: this.name,
-    };
-    if (this.sort !== null) {
-      result.sort = this.sort.toDict(); // KSort.toDict() is not recursive, so it's safe
     }
     return result;
   }
@@ -492,20 +461,6 @@ export class KApply extends KInner {
     };
   }
 
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
-    return {
-      node: "KApply",
-      label: this.label.toDict(), // KLabel.toDict() is not deeply recursive, so it's safe
-      args: terms,
-      arity: this.arity,
-      variable: false,
-    };
-  }
-
   public let(
     options: { label?: string | KLabel; args?: KInner[] } = {}
   ): KApply {
@@ -575,19 +530,6 @@ export class KAs extends KInner {
     };
   }
 
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
-    const [pattern, alias] = terms;
-    return {
-      node: "KAs",
-      pattern: pattern,
-      alias: alias,
-    };
-  }
-
   public let(options: { pattern?: KInner; alias?: KInner } = {}): KAs {
     const pattern = options.pattern ?? this.pattern;
     const alias = options.alias ?? this.alias;
@@ -631,19 +573,6 @@ export class KRewrite extends KInner {
   }
 
   public _toDict(terms: Record<string, any>[]): Record<string, any> {
-    const [lhs, rhs] = terms;
-    return {
-      node: "KRewrite",
-      lhs: lhs,
-      rhs: rhs,
-    };
-  }
-
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
     const [lhs, rhs] = terms;
     return {
       node: "KRewrite",
@@ -755,18 +684,6 @@ export class KSequence extends KInner {
   }
 
   public _toDict(terms: Record<string, any>[]): Record<string, any> {
-    return {
-      node: "KSequence",
-      items: terms,
-      arity: this.arity,
-    };
-  }
-
-  public async _toDictAsync(
-    terms: Record<string, any>[],
-    depth?: number,
-    yieldFrequency?: number
-  ): Promise<Record<string, any>> {
     return {
       node: "KSequence",
       items: terms,

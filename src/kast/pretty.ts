@@ -12,12 +12,7 @@ import {
   KVariable,
 } from "./inner";
 import type { KAst } from "./kast";
-import {
-  sortAcCollections,
-  sortAcCollectionsAsync,
-  undoAliases,
-  undoAliasesAsync,
-} from "./manip";
+import { sortAcCollections, undoAliases } from "./manip";
 import {
   KBubble,
   KClaim,
@@ -48,7 +43,6 @@ export class PrettyPrinter {
   private readonly patchSymbolTable?: (symbolTable: SymbolTable) => void;
   private readonly unalias: boolean;
   private readonly sortCollections: boolean;
-  private readonly _yieldFrequency: number;
   private cachedSymbolTable?: SymbolTable;
 
   constructor(options: {
@@ -57,14 +51,12 @@ export class PrettyPrinter {
     patchSymbolTable?: (symbolTable: SymbolTable) => void;
     unalias?: boolean;
     sortCollections?: boolean;
-    yieldFrequency?: number;
   }) {
     this.definition = options.definition;
     this.extraUnparsingModules = options.extraUnparsingModules || [];
     this.patchSymbolTable = options.patchSymbolTable;
     this.unalias = options.unalias ?? true;
     this.sortCollections = options.sortCollections ?? false;
-    this._yieldFrequency = options.yieldFrequency ?? 1;
   }
 
   get symbolTable(): SymbolTable {
@@ -108,107 +100,7 @@ export class PrettyPrinter {
     throw new Error(`Error unparsing: ${kast}`);
   }
 
-  async printAsync(kast: KAst, depth: number = 0): Promise<string> {
-    // Yield control periodically to prevent stack overflow - yield every call at depth 0
-    if (depth === 0 || depth % this._yieldFrequency === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    if (kast instanceof KAtt) {
-      return this.printKAtt(kast);
-    }
-    if (kast instanceof KSort) {
-      return this.printKSort(kast);
-    }
-    if (kast instanceof KLabel) {
-      return this.printKLabel(kast);
-    }
-    if (kast instanceof KOuter) {
-      return await this.printKOuterAsync(kast, depth + 1);
-    }
-    if (kast instanceof KInner) {
-      let inner = kast;
-      if (this.unalias) {
-        inner = await undoAliasesAsync(
-          this.definition,
-          inner,
-          this._yieldFrequency
-        );
-      }
-      if (this.sortCollections) {
-        inner = await sortAcCollectionsAsync(inner, this._yieldFrequency);
-      }
-      return await this.printKInnerAsync(inner, depth + 1);
-    }
-
-    throw new Error(`Error unparsing: ${kast}`);
-  }
-
   private printKOuter(kast: KOuter): string {
-    if (kast instanceof KTerminal) {
-      return this.printKTerminal(kast);
-    }
-    if (kast instanceof KRegexTerminal) {
-      return this.printKRegexTerminal(kast);
-    }
-    if (kast instanceof KNonTerminal) {
-      return this.printKNonTerminal(kast);
-    }
-    if (kast instanceof KProduction) {
-      return this.printKProduction(kast);
-    }
-    if (kast instanceof KSyntaxSort) {
-      return this.printKSyntaxSort(kast);
-    }
-    if (kast instanceof KSortSynonym) {
-      return this.printKSortSynonym(kast);
-    }
-    if (kast instanceof KSyntaxLexical) {
-      return this.printKSyntaxLexical(kast);
-    }
-    if (kast instanceof KSyntaxAssociativity) {
-      return this.printKSyntaxAssociativity(kast);
-    }
-    if (kast instanceof KSyntaxPriority) {
-      return this.printKSyntaxPriority(kast);
-    }
-    if (kast instanceof KBubble) {
-      return this.printKBubble(kast);
-    }
-    if (kast instanceof KRule) {
-      return this.printKRule(kast);
-    }
-    if (kast instanceof KClaim) {
-      return this.printKClaim(kast);
-    }
-    if (kast instanceof KContext) {
-      return this.printKContext(kast);
-    }
-    if (kast instanceof KImport) {
-      return this.printKImport(kast);
-    }
-    if (kast instanceof KFlatModule) {
-      return this.printKFlatModule(kast);
-    }
-    if (kast instanceof KRequire) {
-      return this.printKRequire(kast);
-    }
-    if (kast instanceof KDefinition) {
-      return this.printKDefinition(kast);
-    }
-
-    throw new Error(`Error unparsing: ${kast}`);
-  }
-
-  private async printKOuterAsync(
-    kast: KOuter,
-    depth: number = 0
-  ): Promise<string> {
-    // Yield control periodically to prevent stack overflow
-    if (depth % this._yieldFrequency === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
     if (kast instanceof KTerminal) {
       return this.printKTerminal(kast);
     }
@@ -285,49 +177,6 @@ export class PrettyPrinter {
     }
 
     throw new Error(`Error unparsing: ${kast}`);
-  }
-
-  private async printKInnerAsync(
-    kast: KInner,
-    depth: number = 0
-  ): Promise<string> {
-    // Yield control periodically to prevent stack overflow
-    if (depth % this._yieldFrequency === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    if (kast instanceof KVariable) {
-      return this.printKVariable(kast);
-    }
-    if (kast instanceof KToken) {
-      return this.printKToken(kast);
-    }
-    if (kast instanceof KApply) {
-      return await this.printKApplyAsync(kast, depth + 1);
-    }
-    if (kast instanceof KAs) {
-      return await this.printKAsAsync(kast, depth + 1);
-    }
-    if (kast instanceof KRewrite) {
-      return await this.printKRewriteAsync(kast, depth + 1);
-    }
-    if (kast instanceof KSequence) {
-      return await this.printKSequenceAsync(kast, depth + 1);
-    }
-
-    throw new Error(`Error unparsing: ${kast}`);
-  }
-
-  /**
-   * Safe iterative async version that completely avoids recursion and uses async toDict
-   */
-  public async printKInnerSafeAsync(kast: KInner): Promise<string> {
-    // Use async toDict to convert to plain object first, which is safe from stack overflow
-    const kastDict = await kast.toDictAsync(0, this._yieldFrequency);
-
-    // Then reconstruct using fromDict and print iteratively
-    const reconstructed = KInner.fromDict(kastDict);
-    return this.printKInnerIteratively(reconstructed);
   }
 
   /**
@@ -548,69 +397,15 @@ export class PrettyPrinter {
     return unparser!(...unparsedArgs);
   }
 
-  private async printKApplyAsync(
-    kapply: KApply,
-    depth: number = 0
-  ): Promise<string> {
-    // Yield control periodically to prevent stack overflow
-    if (depth % this._yieldFrequency === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    const label = kapply.label.name;
-    const args = kapply.args;
-
-    // Process args asynchronously to prevent stack overflow
-    const unparsedArgs: string[] = [];
-    for (let i = 0; i < args.length; i++) {
-      // Yield more frequently when processing arguments
-      if (
-        i % Math.max(1, Math.floor(this._yieldFrequency / 2)) === 0 &&
-        i > 0
-      ) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      unparsedArgs.push(await this.printKInnerAsync(args[i]!, depth + 1));
-    }
-
-    if (kapply.isCell) {
-      const cellContents = unparsedArgs.join("\n").trimEnd();
-      const cellStr = `${label}\n${indent(cellContents)}\n</${label.slice(1)}`;
-      return cellStr.trimEnd();
-    }
-
-    const unparser =
-      label in this.symbolTable
-        ? this.symbolTable[label]
-        : this.appliedLabelStr(label);
-
-    return unparser!(...unparsedArgs);
-  }
-
   private printKAs(kas: KAs): string {
     const patternStr = this.printKInner(kas.pattern);
     const aliasStr = this.printKInner(kas.alias);
     return `${patternStr} #as ${aliasStr}`;
   }
 
-  private async printKAsAsync(kas: KAs, depth: number = 0): Promise<string> {
-    const patternStr = await this.printKInnerAsync(kas.pattern, depth + 1);
-    const aliasStr = await this.printKInnerAsync(kas.alias, depth + 1);
-    return `${patternStr} #as ${aliasStr}`;
-  }
-
   private printKRewrite(krewrite: KRewrite): string {
     const lhsStr = this.printKInner(krewrite.lhs);
     const rhsStr = this.printKInner(krewrite.rhs);
-    return `( ${lhsStr} => ${rhsStr} )`;
-  }
-
-  private async printKRewriteAsync(
-    krewrite: KRewrite,
-    depth: number = 0
-  ): Promise<string> {
-    const lhsStr = await this.printKInnerAsync(krewrite.lhs, depth + 1);
-    const rhsStr = await this.printKInnerAsync(krewrite.rhs, depth + 1);
     return `( ${lhsStr} => ${rhsStr} )`;
   }
 
@@ -637,44 +432,6 @@ export class PrettyPrinter {
       return `${unparsedKSeq}\n${this.printKInner(lastItem)}`;
     } else {
       return `${unparsedKSeq}\n~> ${this.printKInner(lastItem!)}`;
-    }
-  }
-
-  private async printKSequenceAsync(
-    ksequence: KSequence,
-    depth: number = 0
-  ): Promise<string> {
-    if (ksequence.arity === 0) {
-      return ".K";
-    }
-    if (ksequence.arity === 1) {
-      const firstItemStr = await this.printKInnerAsync(
-        ksequence.items[0]!,
-        depth + 1
-      );
-      return `${firstItemStr} ~> .K`;
-    }
-
-    const items = ksequence.items;
-    const unparsedItems: string[] = [];
-
-    // Process items asynchronously
-    for (let i = 0; i < items.length - 1; i++) {
-      unparsedItems.push(await this.printKInnerAsync(items[i]!, depth + 1));
-    }
-    const unparsedKSeq = unparsedItems.join("\n~> ");
-
-    const lastItem = items[items.length - 1]!;
-    const lastItemStr = await this.printKInnerAsync(lastItem, depth + 1);
-
-    if (
-      lastItem instanceof KToken &&
-      lastItem.token === "..." &&
-      lastItem.sort.name === "K"
-    ) {
-      return `${unparsedKSeq}\n${lastItemStr}`;
-    } else {
-      return `${unparsedKSeq}\n~> ${lastItemStr}`;
     }
   }
 

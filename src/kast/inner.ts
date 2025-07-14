@@ -15,7 +15,7 @@ export class KSort extends KAst {
     return new KSort(d.name);
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     return {
       node: "KSort",
       name: this.name,
@@ -66,11 +66,11 @@ export class KLabel extends KAst {
     );
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     return {
       node: "KLabel",
       name: this.name,
-      params: this.params.map((param) => param.toDict()),
+      params: this.params.map((param) => param.toDict(useIteration)),
     };
   }
 
@@ -115,13 +115,45 @@ export abstract class KInner extends KAst {
     "KSequence",
   ]);
 
-  public static fromJson(s: string): KInner {
-    return KInner.fromDict(JSON.parse(s));
+  public static fromJson(s: string, useIteration: boolean = true): KInner {
+    return KInner.fromDict(JSON.parse(s), useIteration);
   }
 
 
 
-  public static fromDict(dct: Record<string, any>): KInner {
+  private static _fromDictRecursive(dct: Record<string, any>): KInner {
+    // Original recursive implementation for comparison
+    const nodeType = dct.node;
+    switch (nodeType) {
+      case "KToken":
+        return KToken._fromDict(dct, []);
+      case "KVariable":
+        return KVariable._fromDict(dct, []);
+      case "KApply":
+        const args = dct.args?.map((arg: any) => KInner._fromDictRecursive(arg)) || [];
+        return KApply._fromDict(dct, args);
+      case "KSequence":
+        const items = dct.items?.map((item: any) => KInner._fromDictRecursive(item)) || [];
+        return KSequence._fromDict(dct, items);
+      case "KRewrite":
+        const lhs = KInner._fromDictRecursive(dct.lhs);
+        const rhs = KInner._fromDictRecursive(dct.rhs);
+        return KRewrite._fromDict(dct, [lhs, rhs]);
+      case "KAs":
+        const pattern = KInner._fromDictRecursive(dct.pattern);
+        const alias = KInner._fromDictRecursive(dct.alias);
+        return KAs._fromDict(dct, [pattern, alias]);
+      default:
+        throw new Error(`Unknown node type: ${nodeType}`);
+    }
+  }
+
+  public static fromDict(dct: Record<string, any>, useIteration: boolean = true): KInner {
+    if (!useIteration) {
+      // Original recursive implementation for comparison
+      return KInner._fromDictRecursive(dct);
+    }
+    
     // Use iterative approach to avoid stack overflow on deeply nested structures
     const stack: { 
       dct: Record<string, any>; 
@@ -292,13 +324,23 @@ export abstract class KInner extends KAst {
   public abstract get terms(): KInner[];
   public abstract letTerms(terms: KInner[]): KInner;
   public abstract match(term: KInner): Subst | null;
-  public abstract _toDict(terms: Record<string, any>[]): Record<string, any>;
+  public abstract _toDict(terms: Record<string, any>[], useIteration?: boolean): Record<string, any>;
 
   public mapInner(f: (term: KInner) => KInner): KInner {
     return this.letTerms(this.terms.map(f));
   }
 
-  public toDict(): Record<string, any> {
+  private _toDictRecursive(): Record<string, any> {
+    // Original recursive implementation for comparison
+    const termDicts = this.terms.map((term) => term._toDictRecursive());
+    return this._toDict(termDicts, false);
+  }
+
+  public toDict(useIteration: boolean = true): Record<string, any> {
+    if (!useIteration) {
+      // Original recursive implementation for comparison
+      return this._toDictRecursive();
+    }
     // Use iterative approach to avoid stack overflow on deeply nested structures
     const stack: { 
       item: KAst; 
@@ -384,7 +426,7 @@ export abstract class KInner extends KAst {
         } else {
           // For other KInner types, use the existing _toDict method
           const termDicts = current.item.terms.map(term => results.get(term)!);
-          results.set(current.item, current.item._toDict(termDicts));
+          results.set(current.item, current.item._toDict(termDicts, true));
         }
       } else if (current.item instanceof KLabel) {
         // Check if all params are processed
@@ -453,11 +495,11 @@ export class KToken extends KInner {
     return new KToken(dct.token, KSort.fromDict(dct.sort));
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KToken",
       token: this.token,
-      sort: this.sort.toDict(),
+      sort: this.sort.toDict(useIteration),
     };
   }
 
@@ -511,13 +553,13 @@ export class KVariable extends KInner {
     return new KVariable(dct.name, sort);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const result: Record<string, any> = {
       node: "KVariable",
       name: this.name,
     };
     if (this.sort !== null) {
-      result.sort = this.sort.toDict();
+      result.sort = this.sort.toDict(useIteration);
     }
     return result;
   }
@@ -597,10 +639,10 @@ export class KApply extends KInner {
     return new KApply(KLabel.fromDict(dct.label), terms);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KApply",
-      label: this.label.toDict(),
+      label: this.label.toDict(useIteration),
       args: terms,
       arity: this.arity,
       variable: false,
@@ -667,7 +709,7 @@ export class KAs extends KInner {
     return new KAs(pattern!, alias!);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const [pattern, alias] = terms;
     return {
       node: "KAs",
@@ -718,7 +760,7 @@ export class KRewrite extends KInner {
     return new KRewrite(lhs!, rhs!);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     const [lhs, rhs] = terms;
     return {
       node: "KRewrite",
@@ -829,7 +871,7 @@ export class KSequence extends KInner {
     return new KSequence(terms);
   }
 
-  public _toDict(terms: Record<string, any>[]): Record<string, any> {
+  public _toDict(terms: Record<string, any>[], useIteration: boolean = true): Record<string, any> {
     return {
       node: "KSequence",
       items: terms,
@@ -943,18 +985,18 @@ export class Subst {
     return Object.keys(this._subst).length;
   }
 
-  public static fromDict(d: Record<string, any>): Subst {
+  public static fromDict(d: Record<string, any>, useIteration: boolean = true): Subst {
     const entries: Record<string, KInner> = {};
     for (const [k, v] of Object.entries(d)) {
-      entries[k] = KInner.fromDict(v);
+      entries[k] = KInner.fromDict(v, useIteration);
     }
     return new Subst(entries);
   }
 
-  public toDict(): Record<string, any> {
+  public toDict(useIteration: boolean = true): Record<string, any> {
     const result: Record<string, any> = {};
     for (const [k, v] of this.entries()) {
-      result[k] = v.toDict();
+      result[k] = v.toDict(useIteration);
     }
     return result;
   }

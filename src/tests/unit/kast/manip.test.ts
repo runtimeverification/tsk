@@ -203,7 +203,7 @@ const ML_TO_BOOL_TEST_DATA: Array<[string, boolean, KInner, KInner]> = [
     new KApply(new KLabel("#Ceil", [new KSort("Set"), GENERATED_TOP_CELL]), [
       new KApply(new KLabel("_Set_"), [new KVariable("_"), new KVariable("_")]),
     ]),
-    new KVariable("Ceil_8118abdf"),
+    new KVariable("Ceil_a06dd9bc"),
   ],
   [
     "ceil-set-concat-sort",
@@ -216,7 +216,7 @@ const ML_TO_BOOL_TEST_DATA: Array<[string, boolean, KInner, KInner]> = [
         ]),
       ]),
     ]),
-    notBool(new KVariable("Ceil_8118abdf")),
+    notBool(new KVariable("Ceil_a06dd9bc")),
   ],
   [
     "exists-equal-int",
@@ -225,7 +225,7 @@ const ML_TO_BOOL_TEST_DATA: Array<[string, boolean, KInner, KInner]> = [
       new KVariable("X"),
       new KApply("_==Int_", [new KVariable("X"), new KVariable("Y")]),
     ]),
-    new KVariable("Exists_0a2f6daa"),
+    new KVariable("Exists_324edb0d"),
   ],
   [
     "kapply-equal-kapply",
@@ -339,10 +339,10 @@ const RENAME_GENERATED_VARS_TEST_DATA: Array<[string, KInner, KInner]> = [
     ]),
     new KApply("<k>", [
       new KSequence([
-        new KVariable("K_CELL_6841c6ac"),
-        new KVariable("K_CELL_3cf31519"),
-        new KVariable("K_CELL_cf2c3f44"),
-        new KVariable("K_CELL_74f80b60"),
+        new KVariable("K_CELL_88e39990"),
+        new KVariable("K_CELL_2f04b3c2"),
+        new KVariable("K_CELL_bfbf8966"),
+        new KVariable("K_CELL_306540d9"),
       ]),
     ]),
   ],
@@ -353,9 +353,9 @@ const RENAME_GENERATED_VARS_TEST_DATA: Array<[string, KInner, KInner]> = [
       new KApply("<cell2>", [new KApply("<cell3>", [new KVariable("_Gen2")])]),
     ]),
     new KApply("<k>", [
-      new KApply("<cell1>", [new KVariable("CELL1_CELL_6b93de7f")]),
+      new KApply("<cell1>", [new KVariable("CELL1_CELL_1a8787ae")]),
       new KApply("<cell2>", [
-        new KApply("<cell3>", [new KVariable("CELL3_CELL_595b45a6")]),
+        new KApply("<cell3>", [new KVariable("CELL3_CELL_07bf24fc")]),
       ]),
     ]),
   ],
@@ -376,8 +376,8 @@ const RENAME_GENERATED_VARS_TEST_DATA: Array<[string, KInner, KInner]> = [
     new KApply("<generatedTop>", [
       new KApply("<k>", [
         new KRewrite(
-          new KVariable("K_CELL_4aeec112"),
-          new KVariable("K_CELL_5c5ec06d")
+          new KVariable("K_CELL_0ca049ad"),
+          new KVariable("K_CELL_8182e58d")
         ),
       ]),
       new KApply("<generatedCounter>", [
@@ -385,12 +385,12 @@ const RENAME_GENERATED_VARS_TEST_DATA: Array<[string, KInner, KInner]> = [
       ]),
       new KApply("<outerCell>", [
         new KRewrite(
-          new KVariable("OUTERCELL_CELL_6b93de7f"),
-          new KVariable("OUTERCELL_CELL_e2a94e4c")
+          new KVariable("OUTERCELL_CELL_1a8787ae"),
+          new KVariable("OUTERCELL_CELL_ea932c77")
         ),
         new KRewrite(
-          new KVariable("OUTERCELL_CELL_96073b6c"),
-          new KVariable("OUTERCELL_CELL_0946a2f7")
+          new KVariable("OUTERCELL_CELL_ac02687d"),
+          new KVariable("OUTERCELL_CELL_78462e10")
         ),
       ]),
     ]),
@@ -402,7 +402,7 @@ const RENAME_GENERATED_VARS_TEST_DATA: Array<[string, KInner, KInner]> = [
       new KVariable("_Gen2"),
     ]),
     new KApply("#And", [
-      new KApply("<k>", [new KVariable("K_CELL_6b93de7f")]),
+      new KApply("<k>", [new KVariable("K_CELL_1a8787ae")]),
       new KVariable("_Gen2"),
     ]),
   ],

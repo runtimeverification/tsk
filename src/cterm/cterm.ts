@@ -1,3 +1,4 @@
+import stringify from "safe-stable-stringify";
 import {
   KApply,
   KInner,
@@ -332,13 +333,11 @@ export class CTerm {
 
     if (selfCsubst === null || otherCsubst === null) {
       throw new Error(
-        `Anti-unification failed to produce a more general state: ${JSON.stringify(
-          {
-            newCterm: newCterm.toString(),
-            self: [this.toString(), selfCsubst],
-            other: [other.toString(), otherCsubst],
-          }
-        )}`
+        `Anti-unification failed to produce a more general state: ${stringify({
+          newCterm: newCterm.toString(),
+          self: [this.toString(), selfCsubst],
+          other: [other.toString(), otherCsubst],
+        })}`
       );
     }
 

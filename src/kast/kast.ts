@@ -11,17 +11,23 @@ export abstract class KAst {
 
   public toJson(): string {
     const dictObj = this.toDict();
+    // Use safe-stable-stringify like we had before - it should handle most cases
     return JSON.stringify(dictObj);
   }
 
   public toString(): string {
-    return JSON.stringify(this.toJson());
+    return this.toJson();
   }
 
   public equals(other: KAst): boolean {
-    // Simple structural equality check using JSON serialization
-    return JSON.stringify(this.toJson()) === JSON.stringify(other.toJson());
+    // Direct field-by-field comparison like Python's dataclass approach
+    if (this.constructor !== other.constructor) {
+      return false;
+    }
+    return this.fieldEquals(other);
   }
+
+  protected abstract fieldEquals(other: KAst): boolean;
 
   public get hash(): string {
     if (this._hash === null) {

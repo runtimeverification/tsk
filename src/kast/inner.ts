@@ -22,9 +22,24 @@ export class KSort extends KAst {
     };
   }
 
+  public async toDictAsync(
+    depth: number = 0,
+    yieldFrequency: number = 10
+  ): Promise<Record<string, any>> {
+    return {
+      node: "KSort",
+      name: this.name,
+    };
+  }
+
   public let(name?: string | null): KSort {
     const name_ = name ?? this.name;
     return new KSort(name_);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSort = other as KSort;
+    return this.name === otherSort.name;
   }
 }
 
@@ -67,6 +82,30 @@ export class KLabel extends KAst {
     };
   }
 
+  public async toDictAsync(
+    depth: number = 0,
+    yieldFrequency: number = 10
+  ): Promise<Record<string, any>> {
+    // Process params asynchronously
+    const paramDicts: Record<string, any>[] = [];
+    for (let i = 0; i < this.params.length; i++) {
+      if (i % yieldFrequency === 0 && i > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      const paramDict = await this.params[i]!.toDictAsync(
+        depth + 1,
+        yieldFrequency
+      );
+      paramDicts.push(paramDict);
+    }
+
+    return {
+      node: "KLabel",
+      name: this.name,
+      params: paramDicts,
+    };
+  }
+
   public let(
     options: { name?: string; params?: (string | KSort)[] } = {}
   ): KLabel {
@@ -77,6 +116,22 @@ export class KLabel extends KAst {
 
   public apply(...args: KInner[]): KApply {
     return new KApply(this, args);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherLabel = other as KLabel;
+    if (this.name !== otherLabel.name) {
+      return false;
+    }
+    if (this.params.length !== otherLabel.params.length) {
+      return false;
+    }
+    for (let i = 0; i < this.params.length; i++) {
+      if (!this.params[i]!.equals(otherLabel.params[i]!)) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -198,6 +253,29 @@ export abstract class KInner extends KAst {
     return this._toDict(termDicts);
   }
 
+  public async toDictAsync(
+    depth: number = 0,
+    yieldFrequency: number = 10
+  ): Promise<Record<string, any>> {
+    // Yield control periodically to prevent stack overflow
+    if (depth % yieldFrequency === 0 && depth > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    // Process all child terms asynchronously
+    const termDicts: Record<string, any>[] = [];
+    for (let i = 0; i < this.terms.length; i++) {
+      const termDict = await this.terms[i]!.toDictAsync(
+        depth + 1,
+        yieldFrequency
+      );
+      termDicts.push(termDict);
+    }
+
+    // Use the sync _toDict method - no need for async version
+    return this._toDict(termDicts);
+  }
+
   protected static combineMatches(substs: (Subst | null)[]): Subst | null {
     let result: Subst | null = new Subst();
 
@@ -257,6 +335,11 @@ export class KToken extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherToken = other as KToken;
+    return this.token === otherToken.token && this.sort.equals(otherToken.sort);
+  }
 }
 
 export class KVariable extends KInner {
@@ -315,6 +398,21 @@ export class KVariable extends KInner {
 
   public match(term: KInner): Subst {
     return new Subst({ [this.name]: term });
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherVar = other as KVariable;
+    if (this.name !== otherVar.name) {
+      return false;
+    }
+    // Handle null comparison
+    if (this.sort === null && otherVar.sort === null) {
+      return true;
+    }
+    if (this.sort === null || otherVar.sort === null) {
+      return false;
+    }
+    return this.sort.equals(otherVar.sort);
   }
 }
 
@@ -390,6 +488,22 @@ export class KApply extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherApply = other as KApply;
+    if (!this.label.equals(otherApply.label)) {
+      return false;
+    }
+    if (this.args.length !== otherApply.args.length) {
+      return false;
+    }
+    for (let i = 0; i < this.args.length; i++) {
+      if (!this.args[i]!.equals(otherApply.args[i]!)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export class KAs extends KInner {
@@ -433,6 +547,13 @@ export class KAs extends KInner {
 
   public match(term: KInner): Subst | null {
     throw new Error("KAs does not support pattern matching");
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherAs = other as KAs;
+    return (
+      this.pattern.equals(otherAs.pattern) && this.alias.equals(otherAs.alias)
+    );
   }
 }
 
@@ -515,6 +636,13 @@ export class KRewrite extends KInner {
      * Similar to apply but using exact syntactic matching instead of pattern matching.
      */
     return bottomUp((t: KInner) => this.replaceTop(t), term);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherRewrite = other as KRewrite;
+    return (
+      this.lhs.equals(otherRewrite.lhs) && this.rhs.equals(otherRewrite.rhs)
+    );
   }
 }
 
@@ -619,6 +747,19 @@ export class KSequence extends KInner {
     }
     return null;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSeq = other as KSequence;
+    if (this.items.length !== otherSeq.items.length) {
+      return false;
+    }
+    for (let i = 0; i < this.items.length; i++) {
+      if (!this.items[i]!.equals(otherSeq.items[i]!)) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export class Subst {
@@ -718,8 +859,8 @@ export class Subst {
       );
     }
 
-    // For other types, use structural equality
-    return JSON.stringify(t1.toDict()) === JSON.stringify(t2.toDict());
+    // For other types, use the new fieldEquals method
+    return t1.equals(t2);
   }
 
   public unapply(term: KInner): KInner {
@@ -873,10 +1014,85 @@ export function bottomUp(f: (term: KInner) => KInner, kinner: KInner): KInner {
   }
 }
 
+export async function bottomUpAsync(
+  f: (term: KInner) => KInner,
+  kinner: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  const stack: any[] = [kinner, []];
+  let operations = 0;
+
+  while (true) {
+    // Yield control periodically
+    if (operations % yieldFrequency === 0 && operations > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    operations++;
+
+    const terms = stack[stack.length - 1];
+    const term = stack[stack.length - 2];
+    const idx = terms.length; // The next child index to process
+
+    if (idx === term.terms.length) {
+      // We've processed all children
+      stack.pop();
+      stack.pop();
+      const transformedTerm = f(term.letTerms(terms));
+      if (!stack || stack.length === 0) {
+        return transformedTerm;
+      }
+      stack[stack.length - 1].push(transformedTerm);
+    } else {
+      // Process the next child
+      stack.push(term.terms[idx]);
+      stack.push([]);
+    }
+  }
+}
+
 export function topDown(f: (term: KInner) => KInner, term: KInner): KInner {
   const stack: any[] = [f(term), []];
 
   while (true) {
+    const terms = stack[stack.length - 1];
+    const currentTerm = stack[stack.length - 2];
+    const idx = terms.length; // The next child index to process
+
+    if (idx === currentTerm.terms.length) {
+      // We've processed all children
+      stack.pop();
+      stack.pop();
+      const termWithNewChildren = currentTerm.letTerms(terms);
+      if (stack.length === 0) {
+        return termWithNewChildren;
+      }
+      stack[stack.length - 1].push(termWithNewChildren);
+    } else {
+      // Process the next child
+      stack.push(f(currentTerm.terms[idx]));
+      stack.push([]);
+    }
+  }
+}
+
+/**
+ * Async version of topDown that yields control periodically to prevent blocking the main thread.
+ */
+export async function topDownAsync(
+  f: (term: KInner) => KInner,
+  term: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  const stack: any[] = [f(term), []];
+  let operations = 0;
+
+  while (true) {
+    // Yield control periodically
+    if (operations % yieldFrequency === 0 && operations > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    operations++;
+
     const terms = stack[stack.length - 1];
     const currentTerm = stack[stack.length - 2];
     const idx = terms.length; // The next child index to process

@@ -673,6 +673,40 @@ export class KAtt extends KAst implements Map<AttKey, any> {
   public dropSource(): KAtt {
     return this.discard([Atts.SOURCE, Atts.LOCATION]);
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherAtt = other as KAtt;
+    // Compare the number of attributes
+    if (this.size !== otherAtt.size) {
+      return false;
+    }
+
+    // Compare each attribute key-value pair
+    for (const [key, value] of this.entries()) {
+      if (!otherAtt.has(key)) {
+        return false;
+      }
+      const otherValue = otherAtt.get(key);
+      // For deep comparison of values, we need to handle different types
+      if (value !== otherValue) {
+        // If values are KAst objects, use their equals method
+        if (
+          value &&
+          typeof value.equals === "function" &&
+          otherValue &&
+          typeof otherValue.equals === "function"
+        ) {
+          if (!value.equals(otherValue)) {
+            return false;
+          }
+        } else {
+          // For primitive values or other objects, use strict equality
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 }
 
 export const EMPTY_ATT = new KAtt();

@@ -24,6 +24,7 @@ import {
   flattenLabel,
   keepVarsSorted,
   topDown,
+  topDownAsync,
   varOccurrences,
 } from "./inner";
 import { KClaim, KDefinition, KFlatModule, KRule, KRuleLike } from "./outer";
@@ -46,7 +47,7 @@ import {
   mlOr,
   mlTop,
 } from "./prelude/ml";
-import { indexedRewrite } from "./rewrite";
+import { indexedRewrite, indexedRewriteAsync } from "./rewrite";
 
 export function isTermLike(kast: KInner): boolean {
   let nonTermFound = false;
@@ -108,6 +109,29 @@ export function sortAcCollections(kast: KInner): KInner {
   }
 
   return topDown(sortAcCollectionsInner, kast);
+}
+
+/**
+ * Async version of sortAcCollections that yields control periodically to prevent stack overflow.
+ */
+export async function sortAcCollectionsAsync(
+  kast: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  function sortAcCollectionsInner(k: KInner): KInner {
+    if (k instanceof KApply) {
+      const acLabels = ["_Set_", "_Map_", "_RangeMap_"];
+      if (
+        acLabels.includes(k.label.name) ||
+        k.label.name.endsWith("CellMap_")
+      ) {
+        return sortAssocLabel(k.label.name, k);
+      }
+    }
+    return k;
+  }
+
+  return topDownAsync(sortAcCollectionsInner, kast, yieldFrequency);
 }
 
 export function ifKtype<T extends KInner>(
@@ -214,6 +238,7 @@ export function mlPredToBool(kast: KInner, unsafe: boolean = false): KInner {
           console.warn(
             `Converting #Ceil condition to variable ${ceilVar.name}: ${k}`
           );
+
           return ceilVar;
         }
         if (k.label.name === "#Exists") {
@@ -865,6 +890,37 @@ export function undoAliases(definition: KDefinition, kast: KInner): KInner {
     aliases.push(new KRewrite(rewrite.rhs, rewrite.lhs));
   }
   return indexedRewrite(kast, aliases);
+}
+
+/**
+ * Async version of undoAliases that yields control periodically to prevent stack overflow.
+ */
+export async function undoAliasesAsync(
+  definition: KDefinition,
+  kast: KInner,
+  yieldFrequency: number = 100
+): Promise<KInner> {
+  const aliases: KRewrite[] = [];
+
+  for (const rule of definition.aliasRules) {
+    const rewrite = rule.body;
+    if (!(rewrite instanceof KRewrite)) {
+      throw new Error(`Expected KRewrite as alias body, found: ${rewrite}`);
+    }
+    if (rule.requires !== null && !rule.requires.equals(TRUE)) {
+      throw new Error(
+        `Expected empty requires clause on alias, found: ${rule.requires}`
+      );
+    }
+    if (rule.ensures !== null && !rule.ensures.equals(TRUE)) {
+      throw new Error(
+        `Expected empty ensures clause on alias, found: ${rule.ensures}`
+      );
+    }
+    aliases.push(new KRewrite(rewrite.rhs, rewrite.lhs));
+  }
+
+  return await indexedRewriteAsync(kast, aliases, yieldFrequency);
 }
 
 export function renameGeneratedVars(term: KInner): KInner {

@@ -74,8 +74,6 @@ export class PrettyPrinter {
   }
 
   print(kast: KAst): string {
-    // console.debug(`Unparsing: ${kast}`);
-
     if (kast instanceof KAtt) {
       return this.printKAtt(kast);
     }
@@ -179,6 +177,186 @@ export class PrettyPrinter {
     }
 
     throw new Error(`Error unparsing: ${kast}`);
+  }
+
+  /**
+   * Iterative version of printKInner that uses explicit stacks to avoid recursion
+   */
+  public printKInnerIteratively(kast: KInner): string {
+    type StackItem = {
+      node: KInner;
+      type: "process" | "combine";
+      childrenNeeded?: number;
+      nodeType?: "KAs" | "KRewrite" | "KSequence" | "KApply";
+    };
+
+    const stack: StackItem[] = [{ node: kast, type: "process" }];
+    const resultStack: string[] = [];
+
+    while (stack.length > 0) {
+      const item = stack.pop()!;
+
+      if (item.type === "combine") {
+        // Collect the required number of children from resultStack
+        const node = item.node;
+        const childrenNeeded = item.childrenNeeded || 0;
+        const children: string[] = [];
+
+        // Pop the children results from the result stack
+        for (let i = 0; i < childrenNeeded; i++) {
+          const child = resultStack.pop();
+          if (child !== undefined) {
+            children.unshift(child); // Reverse order since we're popping
+          }
+        }
+
+        let result: string;
+        if (item.nodeType === "KApply") {
+          const kapply = node as KApply;
+          const label = kapply.label.name;
+          const unparsedArgs = children;
+
+          if (kapply.isCell) {
+            const cellContents = unparsedArgs.join("\n").trimEnd();
+            result = `${label}\n${indent(cellContents)}\n</${label.slice(
+              1
+            )}`.trimEnd();
+          } else {
+            const unparser =
+              label in this.symbolTable
+                ? this.symbolTable[label]
+                : this.appliedLabelStr(label);
+            result = unparser!(...unparsedArgs);
+          }
+        } else if (item.nodeType === "KAs") {
+          const [patternStr, aliasStr] = children;
+          result = `${patternStr} #as ${aliasStr}`;
+        } else if (item.nodeType === "KRewrite") {
+          const [lhsStr, rhsStr] = children;
+          result = `( ${lhsStr} => ${rhsStr} )`;
+        } else if (item.nodeType === "KSequence") {
+          const ksequence = node as KSequence;
+          if (ksequence.arity === 0) {
+            result = ".K";
+          } else if (ksequence.arity === 1) {
+            result = `${children[0]} ~> .K`;
+          } else {
+            const unparsedKSeq = children.slice(0, -1).join("\n~> ");
+            const lastItem = ksequence.items[ksequence.items.length - 1];
+            if (
+              lastItem instanceof KToken &&
+              lastItem.token === "..." &&
+              lastItem.sort.name === "K"
+            ) {
+              result = `${unparsedKSeq}\n${children[children.length - 1]}`;
+            } else {
+              result = `${unparsedKSeq}\n~> ${children[children.length - 1]}`;
+            }
+          }
+        } else {
+          // Fallback - just join children
+          result = children.join(" ");
+        }
+
+        resultStack.push(result);
+        continue;
+      }
+
+      // Process a node
+      const node = item.node;
+
+      if (node instanceof KVariable) {
+        resultStack.push(this.printKVariable(node));
+      } else if (node instanceof KToken) {
+        resultStack.push(this.printKToken(node));
+      } else if (node instanceof KApply) {
+        if (node.args.length === 0) {
+          // No children to process, can print directly
+          const label = node.label.name;
+          const unparser =
+            label in this.symbolTable
+              ? this.symbolTable[label]
+              : this.appliedLabelStr(label);
+          resultStack.push(unparser!());
+        } else {
+          // Push combine operation first (will be processed after children)
+          stack.push({
+            node,
+            type: "combine",
+            childrenNeeded: node.args.length,
+            nodeType: "KApply",
+          });
+
+          // Push children in reverse order (stack is LIFO)
+          for (let i = node.args.length - 1; i >= 0; i--) {
+            stack.push({
+              node: node.args[i]!,
+              type: "process",
+            });
+          }
+        }
+      } else if (node instanceof KAs) {
+        // Handle KAs iteratively
+        stack.push({
+          node,
+          type: "combine",
+          childrenNeeded: 2,
+          nodeType: "KAs",
+        });
+
+        // Push alias first, then pattern (reverse order for stack)
+        stack.push({
+          node: node.alias,
+          type: "process",
+        });
+        stack.push({
+          node: node.pattern,
+          type: "process",
+        });
+      } else if (node instanceof KRewrite) {
+        // Handle KRewrite iteratively
+        stack.push({
+          node,
+          type: "combine",
+          childrenNeeded: 2,
+          nodeType: "KRewrite",
+        });
+
+        // Push rhs first, then lhs (reverse order for stack)
+        stack.push({
+          node: node.rhs,
+          type: "process",
+        });
+        stack.push({
+          node: node.lhs,
+          type: "process",
+        });
+      } else if (node instanceof KSequence) {
+        // Handle KSequence iteratively
+        if (node.arity === 0) {
+          resultStack.push(".K");
+        } else {
+          stack.push({
+            node,
+            type: "combine",
+            childrenNeeded: node.items.length,
+            nodeType: "KSequence",
+          });
+
+          // Push items in reverse order (stack is LIFO)
+          for (let i = node.items.length - 1; i >= 0; i--) {
+            stack.push({
+              node: node.items[i]!,
+              type: "process",
+            });
+          }
+        }
+      } else {
+        throw new Error(`Error unparsing: ${node}`);
+      }
+    }
+
+    return resultStack.pop() || "";
   }
 
   private printKSort(ksort: KSort): string {

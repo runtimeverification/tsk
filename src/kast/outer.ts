@@ -1,3 +1,4 @@
+import equal from "fast-deep-equal";
 import * as fs from "fs";
 import type { FrozenRecord } from "../utils";
 import { frozenRecord, notNone, single } from "../utils";
@@ -86,6 +87,11 @@ export class KRegexTerminal extends KProductionItem {
     const regex = options.regex !== undefined ? options.regex : this.regex;
     return new KRegexTerminal(regex);
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherRegex = other as KRegexTerminal;
+    return this.regex === otherRegex.regex;
+  }
 }
 
 export class KNonTerminal extends KProductionItem {
@@ -123,6 +129,14 @@ export class KNonTerminal extends KProductionItem {
     const name = options.name !== undefined ? options.name : this.name;
     return new KNonTerminal(sort, name);
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherNonTerminal = other as KNonTerminal;
+    return (
+      this.sort.equals(otherNonTerminal.sort) &&
+      this.name === otherNonTerminal.name
+    );
+  }
 }
 
 export class KTerminal extends KProductionItem {
@@ -150,6 +164,11 @@ export class KTerminal extends KProductionItem {
   public let(options: { value?: string } = {}): KTerminal {
     const value = options.value !== undefined ? options.value : this.value;
     return new KTerminal(value);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherTerminal = other as KTerminal;
+    return this.value === otherTerminal.value;
   }
 }
 
@@ -399,6 +418,38 @@ export class KProduction extends KSentence {
 
     return Format.parse(formatStr);
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherProd = other as KProduction;
+    if (!this.sort.equals(otherProd.sort)) {
+      return false;
+    }
+    if (this.items.length !== otherProd.items.length) {
+      return false;
+    }
+    for (let i = 0; i < this.items.length; i++) {
+      if (!this.items[i]!.equals(otherProd.items[i]!)) {
+        return false;
+      }
+    }
+    if (this.params.length !== otherProd.params.length) {
+      return false;
+    }
+    for (let i = 0; i < this.params.length; i++) {
+      if (!this.params[i]!.equals(otherProd.params[i]!)) {
+        return false;
+      }
+    }
+    // Handle null klabel comparison
+    if (this.klabel === null && otherProd.klabel === null) {
+      // Both null, continue
+    } else if (this.klabel === null || otherProd.klabel === null) {
+      return false; // One is null, other is not
+    } else if (!this.klabel.equals(otherProd.klabel)) {
+      return false;
+    }
+    return this.att.equals(otherProd.att);
+  }
 }
 
 export class KSyntaxSort extends KSentence {
@@ -459,6 +510,22 @@ export class KSyntaxSort extends KSentence {
   public letAtt(att: KAtt): KSyntaxSort {
     return this.let({ att });
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSyntaxSort = other as KSyntaxSort;
+    if (!this.sort.equals(otherSyntaxSort.sort)) {
+      return false;
+    }
+    if (this.params.length !== otherSyntaxSort.params.length) {
+      return false;
+    }
+    for (let i = 0; i < this.params.length; i++) {
+      if (!this.params[i]!.equals(otherSyntaxSort.params[i]!)) {
+        return false;
+      }
+    }
+    return this.att.equals(otherSyntaxSort.att);
+  }
 }
 
 export class KSortSynonym extends KSentence {
@@ -509,6 +576,15 @@ export class KSortSynonym extends KSentence {
   public letAtt(att: KAtt): KSortSynonym {
     return this.let({ att });
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherSynonym = other as KSortSynonym;
+    return (
+      this.newSort.equals(otherSynonym.newSort) &&
+      this.oldSort.equals(otherSynonym.oldSort) &&
+      this.att.equals(otherSynonym.att)
+    );
+  }
 }
 
 export class KSyntaxLexical extends KSentence {
@@ -558,6 +634,15 @@ export class KSyntaxLexical extends KSentence {
 
   public letAtt(att: KAtt): KSyntaxLexical {
     return this.let({ att });
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherLexical = other as KSyntaxLexical;
+    return (
+      this.name === otherLexical.name &&
+      this.regex === otherLexical.regex &&
+      this.att.equals(otherLexical.att)
+    );
   }
 }
 
@@ -619,6 +704,22 @@ export class KSyntaxAssociativity extends KSentence {
   public letAtt(att: KAtt): KSyntaxAssociativity {
     return this.let({ att });
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherAssoc = other as KSyntaxAssociativity;
+    if (this.assoc !== otherAssoc.assoc) {
+      return false;
+    }
+    if (this.tags.size !== otherAssoc.tags.size) {
+      return false;
+    }
+    for (const tag of this.tags) {
+      if (!otherAssoc.tags.has(tag)) {
+        return false;
+      }
+    }
+    return this.att.equals(otherAssoc.att);
+  }
 }
 
 export class KSyntaxPriority extends KSentence {
@@ -669,6 +770,26 @@ export class KSyntaxPriority extends KSentence {
 
   public letAtt(att: KAtt): KSyntaxPriority {
     return this.let({ att });
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherPriority = other as KSyntaxPriority;
+    if (this.priorities.length !== otherPriority.priorities.length) {
+      return false;
+    }
+    for (let i = 0; i < this.priorities.length; i++) {
+      const thisGroup = this.priorities[i]!;
+      const otherGroup = otherPriority.priorities[i]!;
+      if (thisGroup.size !== otherGroup.size) {
+        return false;
+      }
+      for (const tag of thisGroup) {
+        if (!otherGroup.has(tag)) {
+          return false;
+        }
+      }
+    }
+    return this.att.equals(otherPriority.att);
   }
 }
 
@@ -723,6 +844,15 @@ export class KBubble extends KSentence {
 
   public letAtt(att: KAtt): KBubble {
     return this.let({ att });
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherBubble = other as KBubble;
+    return (
+      this.sentenceType === otherBubble.sentenceType &&
+      this.contents === otherBubble.contents &&
+      this.att.equals(otherBubble.att)
+    );
   }
 }
 
@@ -809,6 +939,16 @@ export class KRule extends KRuleLike {
     if (priority !== undefined) return parseInt(priority);
     return this.att.has(Atts.OWISE) ? 200 : 50;
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherRule = other as KRule;
+    return (
+      this.body.equals(otherRule.body) &&
+      this.requires.equals(otherRule.requires) &&
+      this.ensures.equals(otherRule.ensures) &&
+      this.att.equals(otherRule.att)
+    );
+  }
 }
 
 export class KClaim extends KRuleLike {
@@ -886,6 +1026,16 @@ export class KClaim extends KRuleLike {
     if (!deps) return [];
     return deps.split(",").map((x: string) => x.trim());
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherClaim = other as KClaim;
+    return (
+      this.body.equals(otherClaim.body) &&
+      this.requires.equals(otherClaim.requires) &&
+      this.ensures.equals(otherClaim.ensures) &&
+      this.att.equals(otherClaim.att)
+    );
+  }
 }
 
 export class KContext extends KSentence {
@@ -937,6 +1087,15 @@ export class KContext extends KSentence {
   public letAtt(att: KAtt): KContext {
     return this.let({ att });
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherContext = other as KContext;
+    return (
+      this.body.equals(otherContext.body) &&
+      this.requires.equals(otherContext.requires) &&
+      this.att.equals(otherContext.att)
+    );
+  }
 }
 
 export class KImport extends KOuter {
@@ -969,6 +1128,11 @@ export class KImport extends KOuter {
     const isPublic =
       options.public !== undefined ? options.public : this.public;
     return new KImport(name, isPublic);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherImport = other as KImport;
+    return this.name === otherImport.name && this.public === otherImport.public;
   }
 }
 
@@ -1143,6 +1307,20 @@ export class KFlatModule
   public letAtt(att: KAtt): KFlatModule {
     return this.let({ att });
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherMod = other as KFlatModule;
+    if (this.name !== otherMod.name) return false;
+    if (this.sentences.length !== otherMod.sentences.length) return false;
+    for (let i = 0; i < this.sentences.length; i++) {
+      if (!this.sentences[i]!.equals(otherMod.sentences[i]!)) return false;
+    }
+    if (this.imports.length !== otherMod.imports.length) return false;
+    for (let i = 0; i < this.imports.length; i++) {
+      if (!this.imports[i]!.equals(otherMod.imports[i]!)) return false;
+    }
+    return this.att.equals(otherMod.att);
+  }
 }
 
 export class KFlatModuleList extends KOuter {
@@ -1188,6 +1366,16 @@ export class KFlatModuleList extends KOuter {
       options.modules !== undefined ? options.modules : this.modules;
     return new KFlatModuleList(mainModule, modules);
   }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherList = other as KFlatModuleList;
+    if (this.mainModule !== otherList.mainModule) return false;
+    if (this.modules.length !== otherList.modules.length) return false;
+    for (let i = 0; i < this.modules.length; i++) {
+      if (!this.modules[i]!.equals(otherList.modules[i]!)) return false;
+    }
+    return true;
+  }
 }
 
 export class KRequire extends KOuter {
@@ -1216,6 +1404,11 @@ export class KRequire extends KOuter {
     const requirePath =
       options.require !== undefined ? options.require : this.require;
     return new KRequire(requirePath);
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherReq = other as KRequire;
+    return this.require === otherReq.require;
   }
 }
 
@@ -1294,6 +1487,20 @@ export class KDefinition
     );
     result["att"] = this.att.toDict();
     return result;
+  }
+
+  protected fieldEquals(other: KAst): boolean {
+    const otherDef = other as KDefinition;
+    if (this.mainModuleName !== otherDef.mainModuleName) return false;
+    if (this.allModules.length !== otherDef.allModules.length) return false;
+    for (let i = 0; i < this.allModules.length; i++) {
+      if (!this.allModules[i]!.equals(otherDef.allModules[i]!)) return false;
+    }
+    if (this.requires.length !== otherDef.requires.length) return false;
+    for (let i = 0; i < this.requires.length; i++) {
+      if (!this.requires[i]!.equals(otherDef.requires[i]!)) return false;
+    }
+    return this.att.equals(otherDef.att);
   }
 
   public let(
@@ -1410,6 +1617,7 @@ export class KDefinition
         module.sentenceByUniqueId
       )) {
         if (uniqueId in uniqueIdMap && sent !== uniqueIdMap[uniqueId]) {
+          // Duplicate UNIQUE_ID found - silently skip
           console.debug(
             `Same UNIQUE_ID found for two different sentences: ${[
               sent,
@@ -1636,10 +1844,7 @@ export class KDefinition
         const otherNoSource = other.let({
           att: other.att.dropSource?.() || other.att,
         });
-        if (
-          JSON.stringify(thisNoSource.toDict()) !==
-          JSON.stringify(otherNoSource.toDict())
-        ) {
+        if (!equal(thisNoSource.toDict(), otherNoSource.toDict())) {
           throw new Error(
             `Found multiple productions for ${symbol}: ${[other, prod]}`
           );
@@ -1805,6 +2010,7 @@ export class KDefinition
                 asort,
               ]}`
             );
+
             return k;
           }
           if (prod.params.includes(psort)) {
@@ -1817,6 +2023,7 @@ export class KDefinition
                   asort,
                 ]}`
               );
+
               return k;
             } else if (!(psort.name in sortDict)) {
               sortDict[psort.name] = asort;
@@ -2039,9 +2246,7 @@ export function readKastDefinition(path: string): KDefinition {
   /**
    * Read a KDefinition from disk, failing if it's not actually a KDefinition.
    */
-  console.info(`Loading JSON definition: ${path}`);
   const jsonDefn = JSON.parse(fs.readFileSync(path, "utf8"));
-  console.info(`Converting JSON definition to Kast: ${path}`);
   const kastDefn = kastTerm(jsonDefn);
   return KDefinition.fromDict(kastDefn);
 }

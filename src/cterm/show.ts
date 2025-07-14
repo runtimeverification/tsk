@@ -6,8 +6,14 @@ import {
   flattenLabel,
   topDown,
 } from "../kast/inner";
-import { freeVars, minimizeTerm } from "../kast/manip";
+import {
+  freeVars,
+  minimizeTerm,
+  sortAcCollections,
+  undoAliases,
+} from "../kast/manip";
 import { DOTS } from "../kast/prelude/k";
+import { PrettyPrinter } from "../kast/pretty";
 import { CTerm } from "./cterm";
 
 /**
@@ -48,20 +54,6 @@ export class CTermShow {
    */
   public printLines(kast: KInner): string[] {
     return this._printer(kast).split("\n");
-  }
-
-  /**
-   * Asynchronously split the printed representation of a KInner into lines.
-   * This prevents stack overflow when the printer function deals with deeply nested structures.
-   *
-   * @param kast - The KInner term to print.
-   * @returns A promise that resolves to an array of strings representing the lines of output.
-   */
-  public async printLinesAsync(kast: KInner): Promise<string[]> {
-    // Yield control before calling the printer to prevent stack overflow
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const printed = this._printer(kast);
-    return printed.split("\n");
   }
 
   /**
@@ -136,54 +128,6 @@ export class CTermShow {
   }
 
   /**
-   * Generate a string representation of the configuration part of a CTerm asynchronously.
-   * This prevents stack overflow errors when dealing with deeply nested configurations.
-   *
-   * @param cterm - The CTerm whose configuration should be displayed.
-   * @param yieldFrequency - How often to yield control (default: 10).
-   * @returns A promise that resolves to an array of strings representing the formatted configuration.
-   */
-  public async showConfigAsync(
-    cterm: CTerm,
-    yieldFrequency: number = 10
-  ): Promise<string[]> {
-    let workingCterm = cterm;
-
-    if (this._breakCellCollections) {
-      workingCterm = new CTerm(
-        await this._topDownAsyncVisitor(
-          (kast) => this._breakCellsVisitorAsync(kast),
-          cterm.config,
-          0,
-          yieldFrequency
-        ),
-        cterm.constraints
-      );
-    }
-
-    if (this._omitLabels.length > 0) {
-      workingCterm = new CTerm(
-        await this._topDownAsync(
-          (kast) => this._omitLabelsVisitor(kast),
-          workingCterm.config,
-          0,
-          yieldFrequency
-        ),
-        workingCterm.constraints
-      );
-    }
-
-    if (this._minimize) {
-      workingCterm = new CTerm(
-        minimizeTerm(workingCterm.config, freeVars(workingCterm.constraint)),
-        workingCterm.constraints
-      );
-    }
-
-    return await this.printLinesAsync(workingCterm.config);
-  }
-
-  /**
    * Generate a string representation of the constraints part of a CTerm.
    *
    * @param cterm - The CTerm whose constraints should be displayed.
@@ -233,45 +177,6 @@ export class CTermShow {
   }
 
   /**
-   * Async visitor function that breaks down cell collections for better readability.
-   * This prevents stack overflow when processing large collections.
-   *
-   * @param kast - The KInner term to potentially transform.
-   * @returns A promise that resolves to the transformed term or the original term if no transformation is needed.
-   */
-  private async _breakCellsVisitorAsync(kast: KInner): Promise<KInner> {
-    if (
-      kast instanceof KApply &&
-      kast.isCell &&
-      kast.args.length === 1 &&
-      kast.args[0] instanceof KApply &&
-      ["_Set_", "_List_", "_Map_"].includes(kast.args[0].label.name)
-    ) {
-      const items = flattenLabel(kast.args[0].label.name, kast.args[0]);
-
-      // Process items asynchronously to prevent stack overflow
-      const printedItems: string[] = [];
-      for (let i = 0; i < items.length; i++) {
-        // Yield control periodically
-        if (i % 10 === 0 && i > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
-        }
-        const item = items[i];
-        if (item) {
-          printedItems.push(this._printer(item));
-        }
-      }
-
-      const printed = new KToken(
-        printedItems.join("\n"),
-        new KSort(kast.label.name.slice(1, -1)) // Remove < and > from cell name
-      );
-      return new KApply(kast.label, [printed]);
-    }
-    return kast;
-  }
-
-  /**
    * Visitor function that replaces specified labels with dots (...).
    *
    * This is useful for hiding parts of the configuration that are not
@@ -286,78 +191,38 @@ export class CTermShow {
     }
     return kast;
   }
+}
 
-  /**
-   * Asynchronous version of topDown traversal to prevent stack overflow.
-   * Similar to the fromDictAsync pattern in KInner class.
-   *
-   * @param f - The transformation function to apply to each node.
-   * @param term - The term to traverse.
-   * @param depth - Current recursion depth.
-   * @param yieldFrequency - How often to yield control.
-   * @returns A promise that resolves to the transformed term.
-   */
-  private async _topDownAsync(
-    f: (term: KInner) => KInner,
-    term: KInner,
-    depth: number = 0,
-    yieldFrequency: number = 10
-  ): Promise<KInner> {
-    // Every yieldFrequency levels, yield control to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+/**
+ * Create an iterative CTermShow that completely avoids deep recursion
+ * by using the PrettyPrinter's iterative methods
+ */
+export function createIterativeCTermShow(
+  prettyPrinter: PrettyPrinter,
+  options: {
+    minimize?: boolean;
+    breakCellCollections?: boolean;
+    omitLabels?: Iterable<string>;
+  } = {}
+): CTermShow {
+  const syncPrinter = (kast: KInner) => {
+    // Apply the same preprocessing as the regular print method
+    let inner = kast;
+    if ((prettyPrinter as any).unalias) {
+      inner = undoAliases(prettyPrinter.definition, inner);
+    }
+    if ((prettyPrinter as any).sortCollections) {
+      inner = sortAcCollections(inner);
     }
 
-    const transformedTerm = f(term);
+    // Use the PrettyPrinter's iterative method for proper formatting
+    return prettyPrinter.printKInnerIteratively(inner);
+  };
 
-    if (transformedTerm.terms.length === 0) {
-      return transformedTerm;
-    }
-
-    // Process all child terms asynchronously
-    const transformedChildren = await Promise.all(
-      transformedTerm.terms.map((childTerm) =>
-        this._topDownAsync(f, childTerm, depth + 1, yieldFrequency)
-      )
-    );
-
-    return transformedTerm.letTerms(transformedChildren);
-  }
-
-  /**
-   * Asynchronous version of topDown traversal with async visitor function.
-   * This version supports visitor functions that return promises.
-   *
-   * @param f - The async transformation function to apply to each node.
-   * @param term - The term to traverse.
-   * @param depth - Current recursion depth.
-   * @param yieldFrequency - How often to yield control.
-   * @returns A promise that resolves to the transformed term.
-   */
-  private async _topDownAsyncVisitor(
-    f: (term: KInner) => Promise<KInner>,
-    term: KInner,
-    depth: number = 0,
-    yieldFrequency: number = 10
-  ): Promise<KInner> {
-    // Every yieldFrequency levels, yield control to prevent stack overflow
-    if (depth % yieldFrequency === 0 && depth > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    const transformedTerm = await f(term);
-
-    if (transformedTerm.terms.length === 0) {
-      return transformedTerm;
-    }
-
-    // Process all child terms asynchronously
-    const transformedChildren = await Promise.all(
-      transformedTerm.terms.map((childTerm) =>
-        this._topDownAsyncVisitor(f, childTerm, depth + 1, yieldFrequency)
-      )
-    );
-
-    return transformedTerm.letTerms(transformedChildren);
-  }
+  return new CTermShow(
+    syncPrinter,
+    options.minimize ?? false,
+    options.breakCellCollections ?? false,
+    options.omitLabels || []
+  );
 }
